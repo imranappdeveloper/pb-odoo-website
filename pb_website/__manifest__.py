@@ -1,0 +1,19 @@
+# -*- coding: utf-8 -*-
+{
+    'name': 'Pacific Boeki Website API & Core',
+    'version': '1.0',
+    'category': 'Website/Website',
+    'summary': 'API endpoints and custom models for Pacific Boeki Next.js website integration.',
+    'description': """
+This module defines custom Odoo models (news, testimonials, shipping rates/schedules)
+and JSON-RPC controllers to expose catalog data to the Next.js static website.
+""",
+    'author': 'Antigravity / Pacific Boeki',
+    'depends': ['product', 'ls_product', 'ls_sale'],
+    'data': [
+        # We will add security rules and views here in later tasks
+    ],
+    'installable': True,
+    'application': True,
+    'license': 'LGPL-3',
+}
