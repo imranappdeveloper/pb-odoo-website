@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pb_testimonial_public,pb.testimonial,model_pb_testimonial,base.group_portal,1,0,0,0
+access_pb_testimonial_user,pb.testimonial,model_pb_testimonial,base.group_user,1,1,1,1
+access_pb_news_public,pb.news,model_pb_news,base.group_portal,1,0,0,0
+access_pb_news_user,pb.news,model_pb_news,base.group_user,1,1,1,1

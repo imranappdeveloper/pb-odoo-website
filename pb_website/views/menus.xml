@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Top-level Menu in App Switcher -->
+    <menuitem id="menu_pb_website_root"
+              name="Website Admin"
+              sequence="100"/>
+
+    <!-- Sub-menus -->
+    <menuitem id="menu_pb_website_testimonials"
+              name="Testimonials"
+              parent="menu_pb_website_root"
+              action="action_pb_testimonial"
+              sequence="10"/>
+
+    <menuitem id="menu_pb_website_news"
+              name="News Articles"
+              parent="menu_pb_website_root"
+              action="action_pb_news"
+              sequence="20"/>
+</odoo>
