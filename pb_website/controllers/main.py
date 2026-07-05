@@ -192,3 +192,148 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in get_new_arrivals")
             return self._make_error_response(_("An unexpected error occurred while fetching new arrivals."), status=500)
+
+    @http.route('/api/v1/website/vehicles', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_vehicles(self, **kwargs):
+        """
+        API Endpoint: Returns a paginated, filtered list of vehicles from product.template.
+        """
+        try:
+            page = int(kwargs.get('page', 1))
+            limit = int(kwargs.get('limit', 10))
+            sort_key = kwargs.get('sort') or kwargs.get('sort_by')
+            
+            filters = kwargs.get('filters', {})
+            if not isinstance(filters, dict):
+                filters = {}
+
+            # Fall back to root-level params if not nested in filters
+            maker = filters.get('maker') or kwargs.get('maker')
+            model = filters.get('model') or kwargs.get('model')
+            year_from = filters.get('year_from') or kwargs.get('year_from')
+            year_to = filters.get('year_to') or kwargs.get('year_to')
+            transmission = filters.get('transmission') or kwargs.get('transmission')
+            fuel = filters.get('fuel') or kwargs.get('fuel')
+            keyword = filters.get('keyword') or kwargs.get('keyword')
+            price_min = filters.get('price_min') or kwargs.get('price_min')
+            price_max = filters.get('price_max') or kwargs.get('price_max')
+            drive_type = filters.get('drive_type') or kwargs.get('drive_type')
+            km_min = filters.get('km_min') or kwargs.get('km_min')
+            km_max = filters.get('km_max') or kwargs.get('km_max')
+
+            domain = [('state', '=', '1_draft')]
+
+            if maker:
+                domain.append(('maker.name', '=ilike', maker))
+            if model:
+                domain.append(('car_name.name', '=ilike', model))
+            if year_from:
+                try:
+                    domain.append(('year', '>=', int(year_from)))
+                except ValueError:
+                    pass
+            if year_to:
+                try:
+                    domain.append(('year', '<=', int(year_to)))
+                except ValueError:
+                    pass
+            if transmission:
+                domain.append(('transmission.name', '=ilike', transmission))
+            if fuel:
+                domain.append(('fuel_type.name', '=ilike', fuel))
+            if drive_type:
+                domain.append(('drive_type', '=', drive_type))
+            if price_min:
+                try:
+                    domain.append(('fob_price', '>=', float(price_min)))
+                except ValueError:
+                    pass
+            if price_max:
+                try:
+                    domain.append(('fob_price', '<=', float(price_max)))
+                except ValueError:
+                    pass
+            if km_min:
+                try:
+                    domain.append(('km', '>=', int(km_min)))
+                except ValueError:
+                    pass
+            if km_max:
+                try:
+                    domain.append(('km', '<=', int(km_max)))
+                except ValueError:
+                    pass
+            if keyword:
+                kw = keyword.strip()
+                domain.extend([
+                    '|', '|', '|', '|',
+                    ('name', 'ilike', kw),
+                    ('car_name.name', 'ilike', kw),
+                    ('maker.name', 'ilike', kw),
+                    ('stock_id', 'ilike', kw),
+                    ('barcode', 'ilike', kw)
+                ])
+
+            sort_map = {
+                'price_asc': 'fob_price asc',
+                'price_desc': 'fob_price desc',
+                'year_asc': 'year asc',
+                'year_desc': 'year desc',
+                'km_asc': 'km asc',
+                'km_desc': 'km desc',
+                'newest': 'create_date desc',
+            }
+            order = sort_map.get(sort_key, 'create_date desc, id desc')
+
+            offset = (page - 1) * limit
+            total_count = request.env['product.template'].sudo().search_count(domain)
+            records = request.env['product.template'].sudo().search(domain, order=order, limit=limit, offset=offset)
+
+            vehicles = []
+            for record in records:
+                image_urls = []
+                if record.image_1920:
+                    image_urls.append(f"/web/image/product.template/{record.id}/image_1920")
+                
+                if hasattr(record, 'product_template_image_ids') and record.product_template_image_ids:
+                    for img in record.product_template_image_ids:
+                        image_urls.append(f"/web/image/product.image/{img.id}/image_1920")
+                
+                if not image_urls:
+                    image_urls.append("/images/placeholder-car.jpg")
+
+                vehicles.append({
+                    "id": record.id,
+                    "name": record.name or "",
+                    "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
+                    "maker": record.maker.name if hasattr(record, 'maker') and record.maker else "",
+                    "model": record.car_name.name if hasattr(record, 'car_name') and record.car_name else "",
+                    "stockId": record.stock_id or "",
+                    "year": record.year or 0,
+                    "km": f"{record.km or ''} km" if record.km else "0 km",
+                    "engineCc": f"{record.engine_cc.name or ''} cc" if hasattr(record, 'engine_cc') and record.engine_cc else "",
+                    "transmission": record.transmission.name if hasattr(record, 'transmission') and record.transmission else "",
+                    "fuelType": record.fuel_type.name if hasattr(record, 'fuel_type') and record.fuel_type else "",
+                    "carCategory": record.car_category.name if hasattr(record, 'car_category') and record.car_category else "",
+                    "driveType": record.drive_type or "right_hand",
+                    "doors": record.doors or "5",
+                    "seatingCapacity": record.seating_capacity or 5,
+                    "exteriorColor": record.exterior_color.name if hasattr(record, 'exterior_color') and record.exterior_color else "",
+                    "grade": record.grade or "4.5",
+                    "fobPriceUsd": record.fob_price or 0,
+                    "fobPriceJpy": record.final_fob_price or 0,
+                    "stockLocation": record.stock_location.name if hasattr(record, 'stock_location') and record.stock_location else "Yokohama, Japan",
+                    "imageUrls": image_urls,
+                    "isFeatured": record.is_featured or False,
+                    "isKenyaStock": record.is_kenya_stock or False,
+                    "isDiscounted": record.is_discounted or False
+                })
+
+            return self._make_json_response({
+                "vehicles": vehicles,
+                "total": total_count
+            })
+        except Exception as e:
+            _logger.exception("Unexpected error in get_vehicles")
+            return self._make_error_response(_("An unexpected error occurred while fetching vehicles."), status=500)
+
