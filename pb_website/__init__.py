@@ -79,3 +79,27 @@ def post_init_hook(env):
             _logger.warning("News mock JSON file not found at %s", json_path)
     else:
         _logger.info("pb.news records already exist, skipping seeding")
+
+    # 3. Seed Freight Rates
+    freight_model = env['pb.freight.rate']
+    if not freight_model.search_count([]):
+        json_path = os.path.join(workspace_dir, 'public', 'mock', 'rates.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                    for item in data:
+                        vals = {
+                            'country': item['country'],
+                            'port': item['port'],
+                            'rate_per_m3': item['ratePerM3'],
+                        }
+                        freight_model.create(vals)
+                _logger.info("Successfully seeded pb.freight.rate model")
+            except Exception as e:
+                _logger.error("Failed to seed freight rates: %s", str(e))
+        else:
+            _logger.warning("Freight rates mock JSON file not found at %s", json_path)
+    else:
+        _logger.info("pb.freight.rate records already exist, skipping seeding")
+

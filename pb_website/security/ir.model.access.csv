@@ -3,3 +3,10 @@ access_pb_testimonial_public,pb.testimonial,model_pb_testimonial,base.group_port
 access_pb_testimonial_user,pb.testimonial,model_pb_testimonial,base.group_user,1,1,1,1
 access_pb_news_public,pb.news,model_pb_news,base.group_portal,1,0,0,0
 access_pb_news_user,pb.news,model_pb_news,base.group_user,1,1,1,1
+access_pb_freight_rate_public,pb.freight.rate,model_pb_freight_rate,base.group_portal,1,0,0,0
+access_pb_freight_rate_user,pb.freight.rate,model_pb_freight_rate,base.group_user,1,1,1,1
+access_pb_team_member_public,pb.team_member,model_pb_team_member,base.group_portal,1,0,0,0
+access_pb_team_member_user,pb.team_member,model_pb_team_member,base.group_user,1,1,1,1
+access_pb_recruitment_inquiry_public,pb.recruitment_inquiry,model_pb_recruitment_inquiry,base.group_portal,1,0,1,0
+access_pb_recruitment_inquiry_user,pb.recruitment_inquiry,model_pb_recruitment_inquiry,base.group_user,1,1,1,1
+

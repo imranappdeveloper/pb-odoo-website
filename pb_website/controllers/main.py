@@ -7,6 +7,22 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+def get_dummy_vehicle_image(record_id):
+    dummy_images = [
+        '/images/scraped/234260.png',
+        '/images/scraped/234264.png',
+        '/images/scraped/234270.png',
+        '/images/scraped/234274.png',
+        '/images/scraped/234687.png',
+        '/images/scraped/234691.png',
+        '/images/scraped/234695.png',
+        '/images/scraped/234699.png',
+        '/images/scraped/1.jpg',
+        '/images/scraped/2.jpg'
+    ]
+    idx = abs(int(record_id or 0)) % len(dummy_images)
+    return dummy_images[idx]
+
 class WebsiteCatalogController(http.Controller):
     """
     Controller for Pacific Boeki Website API Integration.
@@ -119,12 +135,87 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_testimonials")
             return self._make_error_response(_("An unexpected error occurred while fetching testimonials."), status=500)
 
+    @http.route('/api/v1/website/team-members', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_team_members(self, **kwargs):
+        """
+        API Endpoint: Returns list of team members.
+        """
+        try:
+            records = request.env['pb.team_member'].sudo().search([('active', '=', True)], order='display_order, id')
+            members = []
+            for record in records:
+                members.append({
+                    "id": record.id,
+                    "name": record.name,
+                    "role": record.role,
+                    "photoUrl": f"/web/image/pb.team_member/{record.id}/photo" if record.photo else "/images/default-avatar.png",
+                    "displayOrder": record.display_order
+                })
+            return self._make_json_response(members)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_team_members")
+            return self._make_error_response(_("An unexpected error occurred while fetching team members."), status=500)
+
+    @http.route('/api/v1/website/recruitment-inquiry', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def submit_recruitment_inquiry(self, **kwargs):
+        """
+        API Endpoint: Submits a new recruitment inquiry.
+        """
+        try:
+            name = kwargs.get('name')
+            phone = kwargs.get('phone')
+            email = kwargs.get('email')
+            dob = kwargs.get('dob')
+            street_address = kwargs.get('street_address')
+            message = kwargs.get('message')
+            recruitment_type = kwargs.get('recruitment_type')
+            resume_base64 = kwargs.get('resume_base64')
+            resume_filename = kwargs.get('resume_filename')
+
+            # Validation
+            if not all([name, phone, email, message, recruitment_type, resume_base64]):
+                return self._make_error_response(_("Missing required fields."))
+
+            vals = {
+                'name': name,
+                'phone': phone,
+                'email': email,
+                'street_address': street_address,
+                'message': message,
+                'recruitment_type': recruitment_type,
+                'resume': resume_base64,
+                'resume_filename': resume_filename or 'resume.pdf'
+            }
+
+            if dob:
+                vals['dob'] = dob
+
+            inquiry = request.env['pb.recruitment_inquiry'].sudo().create(vals)
+            return self._make_json_response({'success': True, 'id': inquiry.id})
+        except Exception as e:
+            _logger.exception("Unexpected error in submit_recruitment_inquiry")
+            return self._make_error_response(_("An unexpected error occurred while submitting recruitment inquiry."), status=500)
+
     @http.route('/api/v1/website/news', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_news(self, **kwargs):
         """
-        API Endpoint: Returns seeded list of news articles.
+        API Endpoint: Returns seeded list of news articles or single article detail.
         """
         try:
+            article_id = kwargs.get('id')
+            if article_id:
+                record = request.env['pb.news'].sudo().browse(int(article_id))
+                if not record.exists() or not record.published:
+                    return self._make_error_response(_("News article not found."), status=404)
+                return self._make_json_response({
+                    "id": record.id,
+                    "title": record.title,
+                    "body": record.body or "",
+                    "thumbnail": f"/web/image/pb.news/{record.id}/thumbnail" if record.thumbnail else "",
+                    "date": record.date,
+                    "published": record.published
+                })
+
             records = request.env['pb.news'].sudo().search([('published', '=', True)])
             news = []
             for record in records:
@@ -160,7 +251,7 @@ class WebsiteCatalogController(http.Controller):
                         image_urls.append(f"/web/image/product.image/{img.id}/image_1920")
                 
                 if not image_urls:
-                    image_urls.append("/images/placeholder-car.jpg")
+                    image_urls.append(get_dummy_vehicle_image(record.id))
 
                 vehicles.append({
                     "id": record.id,
@@ -300,7 +391,7 @@ class WebsiteCatalogController(http.Controller):
                         image_urls.append(f"/web/image/product.image/{img.id}/image_1920")
                 
                 if not image_urls:
-                    image_urls.append("/images/placeholder-car.jpg")
+                    image_urls.append(get_dummy_vehicle_image(record.id))
 
                 vehicles.append({
                     "id": record.id,
@@ -360,7 +451,7 @@ class WebsiteCatalogController(http.Controller):
                     image_urls.append(f"/web/image/product.image/{img.id}/image_1920")
 
             if not image_urls:
-                image_urls.append("/images/placeholder-car.jpg")
+                image_urls.append(get_dummy_vehicle_image(record.id))
 
             # Extract model code
             model_code = getattr(record, 'model_code', getattr(record, 'x_model_code', ''))
@@ -435,5 +526,202 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in get_vehicle_detail")
             return self._make_error_response(_("An unexpected error occurred while fetching vehicle detail."), status=500)
+
+    @http.route('/api/v1/website/shipping/rates', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_shipping_rates(self, **kwargs):
+        """
+        API Endpoint: Returns list of ports and shipping rate per cubic meter (m³) by destination.
+        """
+        try:
+            records = request.env['pb.freight.rate'].sudo().search([])
+            rates = []
+            for record in records:
+                rates.append({
+                    "id": record.id,
+                    "country": record.country or "",
+                    "port": record.port or "",
+                    "ratePerM3": record.rate_per_m3 or 0.0,
+                })
+            return self._make_json_response(rates)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_shipping_rates")
+            return self._make_error_response(_("An unexpected error occurred while fetching shipping rates."), status=500)
+
+    @http.route('/api/v1/website/register', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def register(self, **kwargs):
+        """
+        API Endpoint: Registers a new portal user and maps name, title, country, phone, and custom flags to res.partner.
+        """
+        try:
+            name = kwargs.get('name')
+            email = kwargs.get('email')
+            password = kwargs.get('password')
+            title_name = kwargs.get('title')
+            country_name = kwargs.get('country')
+            phone = kwargs.get('phone')
+            is_whatsapp = kwargs.get('is_whatsapp', False)
+            is_viber = kwargs.get('is_viber', False)
+            is_line = kwargs.get('is_line', False)
+            access_live_auction = kwargs.get('access_live_auction', False)
+
+            if not name or not email or not password:
+                return self._make_error_response(_("Name, Email, and Password are required fields."), status=400)
+
+            # Check if login already exists
+            existing_user = request.env['res.users'].sudo().search([('login', '=', email)], limit=1)
+            if existing_user:
+                return self._make_error_response(_("A member account with this email already exists."), status=400)
+
+            # Resolve Country ID
+            country_id = False
+            if country_name:
+                country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
+                if country:
+                    country_id = country.id
+
+            # Resolve Title ID
+            title_id = False
+            if title_name:
+                title = request.env['res.partner.title'].sudo().search([('name', '=ilike', title_name)], limit=1)
+                if title:
+                    title_id = title.id
+
+            # Assemble Name with Mr./Ms. prefix if provided
+            full_name = name
+            if title_name:
+                full_name = f"{title_name} {name}"
+
+            # Retrieve base portal group XML ref
+            portal_group = request.env.ref('base.group_portal')
+
+            # Create standard Portal user
+            user_vals = {
+                'name': full_name,
+                'login': email,
+                'email': email,
+                'password': password,
+                'groups_id': [(6, 0, [portal_group.id])],
+            }
+            new_user = request.env['res.users'].sudo().create(user_vals)
+
+            # Write details directly to associated partner record
+            partner = new_user.partner_id
+            partner_vals = {
+                'phone': phone,
+                'mobile': phone,
+                'title': title_id,
+                'country_id': country_id,
+                'x_is_whatsapp': is_whatsapp,
+                'x_is_viber': is_viber,
+                'x_is_line': is_line,
+                'x_access_live_auction': access_live_auction,
+            }
+            partner.sudo().write(partner_vals)
+
+            return self._make_json_response({
+                'uid': new_user.id,
+                'name': new_user.name,
+                'email': new_user.email,
+                'partner_id': partner.id
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in register")
+            return self._make_error_response(_("An unexpected error occurred during user registration."), status=500)
+
+    @http.route('/api/v1/website/forgot-password', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def forgot_password(self, **kwargs):
+        """
+        API Endpoint: Initiates Odoo password reset flow and returns standard or offline reset link.
+        """
+        try:
+            email = kwargs.get('email')
+            if not email:
+                return self._make_error_response(_("Email ID/Login ID is required."), status=400)
+
+            user = request.env['res.users'].sudo().search([('login', '=', email)], limit=1)
+            if not user:
+                return self._make_error_response(_("No member account found with this email ID."), status=404)
+
+            # Generate Odoo reset password token and URL
+            partner = user.partner_id
+            partner.sudo().signup_prepare(signup_type='reset')
+            reset_url = partner.signup_url
+
+            # Attempt sending reset password email
+            try:
+                user.sudo().action_reset_password()
+                email_sent = True
+            except Exception as mail_err:
+                _logger.warning("Failed to send reset email: %s. Proceeding with local token response.", str(mail_err))
+                email_sent = False
+
+            return self._make_json_response({
+                'message': _("Your password reset link has been sent to your email ID !!"),
+                'email': email,
+                'reset_url': reset_url,  # Local dev utility
+                'email_sent': email_sent
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in forgot_password")
+            return self._make_error_response(_("An unexpected error occurred while processing password reset request."), status=500)
+
+    @http.route('/api/v1/website/contact', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def contact(self, **kwargs):
+        """
+        API Endpoint: Creates a new lead in CRM (crm.lead) from contact form submission.
+        """
+        try:
+            tlt = kwargs.get('tlt')
+            name = kwargs.get('name')
+            country_name = kwargs.get('country')
+            email = kwargs.get('email')
+            phone = kwargs.get('phone')
+            is_whatsapp = kwargs.get('is_whatsapp', False)
+            is_viber = kwargs.get('is_viber', False)
+            is_line = kwargs.get('is_line', False)
+            msg = kwargs.get('msg')
+
+            if not name or not email or not msg:
+                return self._make_error_response(_("Name, Email, and Message are required fields."), status=400)
+
+            # Resolve Country ID
+            country_id = False
+            if country_name:
+                country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
+                if country:
+                    country_id = country.id
+
+            # Assemble full contact name
+            contact_name = name
+            if tlt:
+                contact_name = f"{tlt} {name}"
+
+            # Create the lead
+            lead_vals = {
+                'name': f"Website Contact: {name}",
+                'contact_name': contact_name,
+                'email_from': email,
+                'phone': phone,
+                'description': msg,
+                'country_id': country_id,
+                'x_is_whatsapp': bool(is_whatsapp),
+                'x_is_viber': bool(is_viber),
+                'x_is_line': bool(is_line),
+            }
+            lead = request.env['crm.lead'].sudo().create(lead_vals)
+
+            return self._make_json_response({
+                'message': _("Thank you for contacting us! We will get back to you soon."),
+                'lead_id': lead.id
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in contact")
+            return self._make_error_response(_("An unexpected error occurred while submitting contact form."), status=500)
+
+
+
 
 

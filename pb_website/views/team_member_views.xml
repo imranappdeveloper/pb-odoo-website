@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Team Member List View -->
+    <record id="view_pb_team_member_list" model="ir.ui.view">
+        <field name="name">pb.team_member.list</field>
+        <field name="model">pb.team_member</field>
+        <field name="arch" type="xml">
+            <list string="Team Members">
+                <field name="name"/>
+                <field name="role"/>
+                <field name="display_order"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Team Member Form View -->
+    <record id="view_pb_team_member_form" model="ir.ui.view">
+        <field name="name">pb.team_member.form</field>
+        <field name="model">pb.team_member</field>
+        <field name="arch" type="xml">
+            <form string="Team Member">
+                <sheet>
+                    <field name="photo" widget="image" class="oe_avatar" options="{'preview_image': 'photo'}"/>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="Member Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="role" placeholder="e.g. Sales Executive"/>
+                            <field name="display_order"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_pb_team_member" model="ir.actions.act_window">
+        <field name="name">Team Members</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pb.team_member</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create the first team member!
+            </p>
+        </field>
+    </record>
+</odoo>
