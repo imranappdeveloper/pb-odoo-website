@@ -550,22 +550,19 @@ class WebsiteCatalogController(http.Controller):
     @http.route('/api/v1/website/register', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def register(self, **kwargs):
         """
-        API Endpoint: Registers a new portal user and maps name, title, country, phone, and custom flags to res.partner.
+        API Endpoint: Registers a new portal user and maps name, email, phone, country, and company details to res.partner.
         """
         try:
             name = kwargs.get('name')
             email = kwargs.get('email')
             password = kwargs.get('password')
-            title_name = kwargs.get('title')
             country_name = kwargs.get('country')
             phone = kwargs.get('phone')
-            is_whatsapp = kwargs.get('is_whatsapp', False)
-            is_viber = kwargs.get('is_viber', False)
-            is_line = kwargs.get('is_line', False)
-            access_live_auction = kwargs.get('access_live_auction', False)
+            company_type = kwargs.get('company_type', 'person')
+            company_name = kwargs.get('company_name')
 
-            if not name or not email or not password:
-                return self._make_error_response(_("Name, Email, and Password are required fields."), status=400)
+            if not name or not email or not password or not country_name or not phone:
+                return self._make_error_response(_("Name, Email, Password, Country, and Phone are required fields."), status=400)
 
             # Check if login already exists
             existing_user = request.env['res.users'].sudo().search([('login', '=', email)], limit=1)
@@ -579,24 +576,12 @@ class WebsiteCatalogController(http.Controller):
                 if country:
                     country_id = country.id
 
-            # Resolve Title ID
-            title_id = False
-            if title_name:
-                title = request.env['res.partner.title'].sudo().search([('name', '=ilike', title_name)], limit=1)
-                if title:
-                    title_id = title.id
-
-            # Assemble Name with Mr./Ms. prefix if provided
-            full_name = name
-            if title_name:
-                full_name = f"{title_name} {name}"
-
             # Retrieve base portal group XML ref
             portal_group = request.env.ref('base.group_portal')
 
             # Create standard Portal user
             user_vals = {
-                'name': full_name,
+                'name': name,
                 'login': email,
                 'email': email,
                 'password': password,
@@ -609,13 +594,13 @@ class WebsiteCatalogController(http.Controller):
             partner_vals = {
                 'phone': phone,
                 'mobile': phone,
-                'title': title_id,
                 'country_id': country_id,
-                'x_is_whatsapp': is_whatsapp,
-                'x_is_viber': is_viber,
-                'x_is_line': is_line,
-                'x_access_live_auction': access_live_auction,
+                'company_type': company_type,
+                'is_company': company_type == 'company',
             }
+            if company_name:
+                partner_vals['company_name'] = company_name
+
             partner.sudo().write(partner_vals)
 
             return self._make_json_response({
@@ -628,6 +613,7 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in register")
             return self._make_error_response(_("An unexpected error occurred during user registration."), status=500)
+
 
     @http.route('/api/v1/website/forgot-password', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def forgot_password(self, **kwargs):
