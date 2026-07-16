@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "title": "Toyota launch \"Sora1\" Fuel Cell Electrified Vehicle Bus",
+    "body": "Toyota City, Japan- Toyota Motor Corporation (Toyota) announces today the launch of its updated \"Sora1\" Fuel Cell Electrified Vehicle bus (FCEV bus) in August and improvements to its preventive safety performance through the use of ITS functions (ITS: Intelligent Transport Systems).\n\nAdditionally, the Sora's transportation capacity, speed, and punctuality have been expanded. As a public transport bus, the Sora requires both a high operation rate and high safety performance at all times. To this end, the updated model includes a function that cautions the driver when making right turns at intersections and a system that enables passengers to activate an emergency stop in urgent situations, such as if the driver suddenly falls ill.\n\nEmergency Driving Stop System (EDSS)\nIf an urgent situation occurs, such as the driver suddenly falling ill, this system allows the driver or passengers to press the emergency brake switch to decelerate the bus and bring it to a stop. The control system has been designed specifically for public transport buses, where the safety of standing passengers is crucial. As the bus starts to decelerate, red flashing lights and a voice alert passengers to the emergency; those outside the vehicle and nearby are alerted to the emergency via a horn and flashing stop lights and hazard lights.\n\nCollision Warning System\nIf the millimeter-wave radar installed at the front of the bus detects there is a risk of colliding with a vehicle or obstacle ahead on the road, it alerts the driver with a warning buzzer and activates a warning notification on the monitor screen. The system considers the safety of standing passengers and seated passengers who have not fastened their seatbelts, and supports the driver in avoiding collisions by assisting with steering.",
+    "thumbnail": "/images/scraped/large_news_831.jpg",
+    "date": "2019-09-09",
+    "published": true
+  },
+  {
+    "id": 2,
+    "title": "New Nissan Serena goes on sale in Japan",
+    "body": "Nissan today introduced the new Serena, the latest version of the company's best-selling minivan, featuring a fresh design and advanced technologies.\n\nThe Serena has been a mainstay of family transportation in Japan for decades, and this new model brings significant updates in refinement, driver assistance technology, and electrified efficiency. It features Nissan's second-generation e-POWER system, which offers a smoother, quieter, and more responsive drive. The new Serena also comes equipped with ProPILOT 2.0 driver assistance technology, enabling hands-off driving in a single lane on a highway, a first for minivans in Japan.",
+    "thumbnail": "/images/scraped/large_news_853.jpg",
+    "date": "2019-09-09",
+    "published": true
+  },
+  {
+    "id": 3,
+    "title": "Toyota's New Hiace Series for Overseas Markets Debuts in the Philippines",
+    "body": "Toyota Motor Corporation (Toyota) announces today the world premiere of its first new Hiace model design for overseas markets. The new Hiace is built on a specially developed new platform that significantly enhances both active and passive safety.\n\nThe model features a semi-bonnet design that improves crash safety performance and creates a spacious, quiet, and comfortable cabin for passengers. The new Hiace will be launched in the Philippines first, before being introduced sequentially to other countries and regions, including Asia, the Middle East, Africa, Oceania, and Latin America. It is designed to meet the diverse needs of transport, tourism, and logistics business operators, offering excellent durability, reliability, and cargo capacity. The vehicle is equipped with high-efficiency engines and advanced driver assistance systems to ensure a safe and cost-effective operation for commercial transport.",
+    "thumbnail": "/images/scraped/large_news_hiace.jpg",
+    "date": "2019-09-09",
+    "published": true
+  }
+]

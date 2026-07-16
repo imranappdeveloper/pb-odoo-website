@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "title": "peugeot 208",
+    "name": "Gerald",
+    "country": "Kenya",
+    "rating": 5,
+    "text": "I have managed to clear the two peugeot 208. I just wanted to say thank you so much for getting me clean and excellent cars. Pacific Boeki best company to buy from. Please see pictures below. Can't wait for my next purchases...",
+    "photoUrl": "/images/scraped/testimonial_6.jpg",
+    "date": "2022-05-07"
+  },
+  {
+    "id": 2,
+    "title": "Certainly recommend",
+    "name": "",
+    "country": "Jamaica",
+    "rating": 5,
+    "text": "Big thank you for the awesome service provided, from the constant support, promptness and quality car received. Would certainly recommend.",
+    "photoUrl": "/images/scraped/testimonial_7.jpg",
+    "date": "2020-12-16"
+  },
+  {
+    "id": 3,
+    "title": "Received the car",
+    "name": "Mr. ibrahim",
+    "country": "United Arab Emirates",
+    "rating": 5,
+    "text": "The transaction process was very satisfactory. I received a car in very good condition and though this is my first online transaction, I can safely say this site is the best.",
+    "photoUrl": "/images/scraped/testimonial_3.jpg",
+    "date": "2019-09-09"
+  },
+  {
+    "id": 4,
+    "title": "Thanks, Pacific",
+    "name": "Mr. Soltik Joel",
+    "country": "Austria",
+    "rating": 4,
+    "text": "Trust me it's the best that I have ever purchased from Japan. Car is good looking, no mechanical or electrical faults, smooth running and very clean. Thank you so much.",
+    "photoUrl": "/images/scraped/testimonial_2.jpg",
+    "date": "2019-09-09"
+  },
+  {
+    "id": 5,
+    "title": "Am thankful to Pacific, which is indeed helpful.",
+    "name": "Mr. Denroy Forbes",
+    "country": "Jamaica",
+    "rating": 5,
+    "text": "Am thankful to your website, which is indeed helpful. I got my desired vehicles.",
+    "photoUrl": "/images/scraped/testimonial_1.jpg",
+    "date": "2019-09-09"
+  }
+]

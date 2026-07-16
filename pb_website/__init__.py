@@ -14,31 +14,28 @@ def post_init_hook(env):
     """
     Automatic seeding function that runs when the pb_website module is installed.
     """
-    _logger.info("Executing post_init_hook: Seeding testimonials and news...")
+    _logger.info("Executing post_init_hook: Seeding testimonials, news, and team members...")
 
     module_dir = os.path.dirname(__file__)
-    workspace_dir = os.path.abspath(os.path.join(module_dir, '..', '..', '..', 'PB-Web'))
-    
-    if not os.path.exists(workspace_dir):
-        workspace_dir = '/Users/imran/Documents/projects/PB/PB-Web'
+    seed_dir = os.path.join(module_dir, 'data', 'seed')
 
     # 1. Seed Testimonials
     testimonial_model = env['pb.testimonial']
     if not testimonial_model.search_count([]):
-        json_path = os.path.join(workspace_dir, 'public', 'mock', 'testimonials.json')
+        json_path = os.path.join(seed_dir, 'testimonials.json')
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r') as f:
                     data = json.load(f)
                     for item in data:
                         vals = {
-                            'name': item['name'],
+                            'name': item['name'] or "Anonymous Customer",
                             'country': item['country'],
                             'rating': item['rating'],
                             'text': item['text'],
                         }
                         photo_name = os.path.basename(item['photoUrl'])
-                        img_path = os.path.join(workspace_dir, 'public', 'images', 'scraped', photo_name)
+                        img_path = os.path.join(seed_dir, 'images', photo_name)
                         if os.path.exists(img_path):
                             with open(img_path, 'rb') as img_f:
                                 vals['photo'] = base64.b64encode(img_f.read())
@@ -54,7 +51,7 @@ def post_init_hook(env):
     # 2. Seed News
     news_model = env['pb.news']
     if not news_model.search_count([]):
-        json_path = os.path.join(workspace_dir, 'public', 'mock', 'news.json')
+        json_path = os.path.join(seed_dir, 'news.json')
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r') as f:
@@ -67,7 +64,7 @@ def post_init_hook(env):
                             'published': item['published'],
                         }
                         img_name = os.path.basename(item['thumbnail'])
-                        img_path = os.path.join(workspace_dir, 'public', 'images', 'scraped', img_name)
+                        img_path = os.path.join(seed_dir, 'images', img_name)
                         if os.path.exists(img_path):
                             with open(img_path, 'rb') as img_f:
                                 vals['thumbnail'] = base64.b64encode(img_f.read())
@@ -79,5 +76,31 @@ def post_init_hook(env):
             _logger.warning("News mock JSON file not found at %s", json_path)
     else:
         _logger.info("pb.news records already exist, skipping seeding")
+
+    # 3. Seed Team Members
+    team_model = env['pb.team_member']
+    if not team_model.search_count([]):
+        try:
+            team_model.create({
+                'name': 'Kenji Tanaka',
+                'role': 'Sales Director',
+                'display_order': 10
+            })
+            team_model.create({
+                'name': 'Sarah Jenkins',
+                'role': 'Customer Relationship Manager',
+                'display_order': 20
+            })
+            team_model.create({
+                'name': 'Muhammad Ali',
+                'role': 'Logistics Coordinator',
+                'display_order': 30
+            })
+            _logger.info("Successfully seeded pb.team_member model")
+        except Exception as e:
+            _logger.error("Failed to seed team members: %s", str(e))
+    else:
+        _logger.info("pb.team_member records already exist, skipping seeding")
+
 
 
