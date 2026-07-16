@@ -533,15 +533,15 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Returns list of ports and shipping rate per cubic meter (m³) by destination.
         """
         try:
-            records = request.env['pb.freight.rate'].sudo().search([])
-            rates = []
-            for record in records:
-                rates.append({
-                    "id": record.id,
-                    "country": record.country or "",
-                    "port": record.port or "",
-                    "ratePerM3": record.rate_per_m3 or 0.0,
-                })
+            # Serve hardcoded dummy data as requested
+            rates = [
+                {"id": 1, "country": "Kenya", "port": "Mombasa", "ratePerM3": 95.0},
+                {"id": 2, "country": "Tanzania", "port": "Dar es Salaam", "ratePerM3": 98.0},
+                {"id": 3, "country": "Chile", "port": "Iquique", "ratePerM3": 110.0},
+                {"id": 4, "country": "Jamaica", "port": "Kingston", "ratePerM3": 125.0},
+                {"id": 5, "country": "Angola", "port": "Durban", "ratePerM3": 110.0},
+                {"id": 6, "country": "Angola", "port": "Luanda", "ratePerM3": 120.0}
+            ]
             return self._make_json_response(rates)
         except Exception as e:
             _logger.exception("Unexpected error in get_shipping_rates")

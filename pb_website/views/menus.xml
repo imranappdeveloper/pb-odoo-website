@@ -18,12 +18,6 @@
               action="action_pb_news"
               sequence="20"/>
 
-    <menuitem id="menu_pb_website_freight_rates"
-              name="Freight Rates"
-              parent="menu_pb_website_root"
-              action="action_pb_freight_rate"
-              sequence="30"/>
-
     <menuitem id="menu_pb_website_team_members"
               name="Team Members"
               parent="menu_pb_website_root"
