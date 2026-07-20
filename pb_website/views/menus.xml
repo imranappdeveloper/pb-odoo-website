@@ -29,5 +29,11 @@
               parent="menu_pb_website_root"
               action="action_pb_recruitment_inquiry"
               sequence="50"/>
+
+    <menuitem id="menu_pb_website_banners"
+              name="Hero Banners"
+              parent="menu_pb_website_root"
+              action="action_pb_banner"
+              sequence="60"/>
 </odoo>
 

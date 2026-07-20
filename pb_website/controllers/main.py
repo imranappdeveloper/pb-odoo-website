@@ -135,6 +135,30 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_testimonials")
             return self._make_error_response(_("An unexpected error occurred while fetching testimonials."), status=500)
 
+    @http.route('/api/v1/website/banners', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_banners(self, **kwargs):
+        """
+        API Endpoint: Returns list of active hero banners.
+        """
+        try:
+            records = request.env['pb.banner'].sudo().search([('is_active', '=', True)], order='sequence, id')
+            banners = []
+            for record in records:
+                banners.append({
+                    "id": record.id,
+                    "name": record.name,
+                    "imageUrl": f"/web/image/pb.banner/{record.id}/image" if record.image else "",
+                    "sequence": record.sequence,
+                    "isActive": record.is_active,
+                    "title": record.title or "",
+                    "subtitle": record.subtitle or "",
+                    "url": record.url or ""
+                })
+            return self._make_json_response(banners)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_banners")
+            return self._make_error_response(_("An unexpected error occurred while fetching banners."), status=500)
+
     @http.route('/api/v1/website/team-members', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_team_members(self, **kwargs):
         """
@@ -533,15 +557,16 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Returns list of ports and shipping rate per cubic meter (m³) by destination.
         """
         try:
-            # Serve hardcoded dummy data as requested
-            rates = [
-                {"id": 1, "country": "Kenya", "port": "Mombasa", "ratePerM3": 95.0},
-                {"id": 2, "country": "Tanzania", "port": "Dar es Salaam", "ratePerM3": 98.0},
-                {"id": 3, "country": "Chile", "port": "Iquique", "ratePerM3": 110.0},
-                {"id": 4, "country": "Jamaica", "port": "Kingston", "ratePerM3": 125.0},
-                {"id": 5, "country": "Angola", "port": "Durban", "ratePerM3": 110.0},
-                {"id": 6, "country": "Angola", "port": "Luanda", "ratePerM3": 120.0}
-            ]
+            # Fetch port destination rates from the live database
+            ports = request.env['port.destination'].sudo().search([])
+            rates = []
+            for port in ports:
+                rates.append({
+                    "id": port.id,
+                    "country": port.country_of_port.name if port.country_of_port else "",
+                    "port": port.name,
+                    "ratePerM3": port.default_cost or 0.0
+                })
             return self._make_json_response(rates)
         except Exception as e:
             _logger.exception("Unexpected error in get_shipping_rates")

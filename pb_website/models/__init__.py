@@ -7,5 +7,6 @@ from . import res_partner
 from . import crm_lead
 from . import team_member
 from . import recruitment_inquiry
+from . import banner
 
 

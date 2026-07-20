@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Japan Used Cars Banner 1",
+    "image": "1-banner.jpg",
+    "sequence": 10,
+    "is_active": true,
+    "title": "Premium Japanese Used Cars",
+    "subtitle": "Direct from Tokyo, best quality and service",
+    "url": "/stock_list.php"
+  },
+  {
+    "name": "Japan Used Cars Banner 2",
+    "image": "2-banner.jpg",
+    "sequence": 20,
+    "is_active": true,
+    "title": "Exporting Worldwide",
+    "subtitle": "Shipping to over 130 countries globally",
+    "url": "/stock_list.php"
+  },
+  {
+    "name": "Japan Used Cars Banner 3",
+    "image": "3-banner.jpg",
+    "sequence": 30,
+    "is_active": true,
+    "title": "Direct Auction Access",
+    "subtitle": "Bid on live Japanese auto auctions today",
+    "url": "/stock_list.php"
+  },
+  {
+    "name": "Japan Used Cars Banner 4",
+    "image": "4-banner.jpg",
+    "sequence": 40,
+    "is_active": true,
+    "title": "Unmatched Quality Control",
+    "subtitle": "Thorough inspection before every shipment",
+    "url": "/stock_list.php"
+  }
+]

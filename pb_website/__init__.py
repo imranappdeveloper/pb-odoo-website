@@ -102,5 +102,37 @@ def post_init_hook(env):
     else:
         _logger.info("pb.team_member records already exist, skipping seeding")
 
+    # 4. Seed Banners
+    banner_model = env['pb.banner']
+    if not banner_model.search_count([]):
+        json_path = os.path.join(seed_dir, 'banners.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                    for item in data:
+                        vals = {
+                            'name': item['name'],
+                            'sequence': item.get('sequence', 10),
+                            'is_active': item.get('is_active', True),
+                            'title': item.get('title'),
+                            'subtitle': item.get('subtitle'),
+                            'url': item.get('url'),
+                        }
+                        img_name = item.get('image')
+                        if img_name:
+                            img_path = os.path.join(seed_dir, 'images', img_name)
+                            if os.path.exists(img_path):
+                                with open(img_path, 'rb') as img_f:
+                                    vals['image'] = base64.b64encode(img_f.read())
+                        banner_model.create(vals)
+                _logger.info("Successfully seeded pb.banner model")
+            except Exception as e:
+                _logger.error("Failed to seed banners: %s", str(e))
+        else:
+            _logger.warning("Banners mock JSON file not found at %s", json_path)
+    else:
+        _logger.info("pb.banner records already exist, skipping seeding")
+
 
 

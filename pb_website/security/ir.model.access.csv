@@ -7,4 +7,6 @@ access_pb_team_member_public,pb.team_member,model_pb_team_member,base.group_port
 access_pb_team_member_user,pb.team_member,model_pb_team_member,base.group_user,1,1,1,1
 access_pb_recruitment_inquiry_public,pb.recruitment_inquiry,model_pb_recruitment_inquiry,base.group_portal,1,0,1,0
 access_pb_recruitment_inquiry_user,pb.recruitment_inquiry,model_pb_recruitment_inquiry,base.group_user,1,1,1,1
+access_pb_banner_public,pb.banner,model_pb_banner,base.group_portal,1,0,0,0
+access_pb_banner_user,pb.banner,model_pb_banner,base.group_user,1,1,1,1
 

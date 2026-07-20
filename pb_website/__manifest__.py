@@ -16,6 +16,7 @@ and JSON-RPC controllers to expose catalog data to the Next.js static website.
         'views/news_views.xml',
         'views/team_member_views.xml',
         'views/recruitment_inquiry_views.xml',
+        'views/banner_views.xml',
         'views/menus.xml',
     ],
     'post_init_hook': 'post_init_hook',
