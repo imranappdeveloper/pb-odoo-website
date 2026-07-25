@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_pb_job_list" model="ir.ui.view">
+        <field name="name">pb.job.list</field>
+        <field name="model">pb.job</field>
+        <field name="arch" type="xml">
+            <list string="Job Openings">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="job_title"/>
+                <field name="job_category"/>
+                <field name="location"/>
+                <field name="working_hours"/>
+                <field name="salary"/>
+                <field name="is_active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_pb_job_form" model="ir.ui.view">
+        <field name="name">pb.job.form</field>
+        <field name="model">pb.job</field>
+        <field name="arch" type="xml">
+            <form string="Job Opening">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="is_active"/>
+                    <group>
+                        <group string="Basic Information">
+                            <field name="name"/>
+                            <field name="job_title"/>
+                            <field name="company_name"/>
+                            <field name="industry"/>
+                            <field name="job_category"/>
+                            <field name="sequence"/>
+                            <field name="is_active"/>
+                        </group>
+                        <group string="Working Conditions">
+                            <field name="location"/>
+                            <field name="address"/>
+                            <field name="working_hours"/>
+                            <field name="break_time"/>
+                            <field name="work_days"/>
+                            <field name="salary"/>
+                            <field name="transport_allowance"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Overview &amp; Intro">
+                            <field name="intro" placeholder="Introduction / Short overview of the role..."/>
+                        </page>
+                        <page string="Main Duties">
+                            <field name="main_duties" placeholder="Enter main duties (one per line)..."/>
+                        </page>
+                        <page string="Requirements">
+                            <field name="requirements" placeholder="Enter qualifications &amp; requirements (one per line)..."/>
+                        </page>
+                        <page string="Benefits &amp; Notes">
+                            <group>
+                                <field name="benefits" placeholder="Benefits &amp; welfare details..."/>
+                                <field name="closing_note" placeholder="Closing highlight / motivational text..."/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_pb_job" model="ir.actions.act_window">
+        <field name="name">Job Openings</field>
+        <field name="res_model">pb.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Website Job Opening!
+            </p>
+            <p>
+                Manage recruitment positions displayed on the Pacific Boeki website.
+            </p>
+        </field>
+    </record>
+</odoo>

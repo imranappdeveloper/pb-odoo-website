@@ -159,6 +159,50 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_banners")
             return self._make_error_response(_("An unexpected error occurred while fetching banners."), status=500)
 
+    @http.route('/api/v1/website/gallery', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_gallery(self, **kwargs):
+        """
+        API Endpoint: Returns list of active photo gallery images.
+        """
+        try:
+            records = request.env['pb.gallery'].sudo().search([('is_active', '=', True)], order='sequence, id')
+            images = []
+            for record in records:
+                images.append({
+                    "id": record.id,
+                    "name": record.name,
+                    "imageUrl": f"/web/image/pb.gallery/{record.id}/image" if record.image else "",
+                    "mediumUrl": f"/web/image/pb.gallery/{record.id}/image_medium" if record.image_medium else "",
+                    "sequence": record.sequence,
+                    "isActive": record.is_active
+                })
+            return self._make_json_response(images)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_gallery")
+            return self._make_error_response(_("An unexpected error occurred while fetching gallery images."), status=500)
+
+    @http.route('/api/v1/website/model-discounts', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_model_discounts(self, **kwargs):
+        """
+        API Endpoint: Returns list of active model discounts where discount_percent > 0.
+        """
+        try:
+            records = request.env['pb.model.discount'].sudo().search([
+                ('active', '=', True),
+                ('discount_percent', '>', 0)
+            ])
+            data = [
+                {
+                    "model_name": rec.model_name,
+                    "discount_percent": rec.discount_percent
+                }
+                for rec in records
+            ]
+            return self._make_json_response(data)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_model_discounts")
+            return self._make_error_response(_("An unexpected error occurred while fetching model discounts."), status=500)
+
     @http.route('/api/v1/website/team-members', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_team_members(self, **kwargs):
         """
@@ -731,6 +775,270 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in contact")
             return self._make_error_response(_("An unexpected error occurred while submitting contact form."), status=500)
+
+    @http.route('/api/v1/website/member/profile', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def member_profile(self, **kwargs):
+        """
+        API Endpoint: Retrieves or updates the logged-in user's partner profile.
+        """
+        try:
+            if not request.session.uid:
+                return self._make_error_response(_("Authentication required."), status=401)
+
+            user = request.env['res.users'].sudo().browse(request.session.uid)
+            partner = user.partner_id
+
+            # If request contains parameters, we treat it as an update (matching Next.js POST /api/v1/website/member/profile)
+            if kwargs:
+                name = kwargs.get('name')
+                title = kwargs.get('title')
+                company = kwargs.get('company')
+                address = kwargs.get('address')
+                city = kwargs.get('city')
+                province = kwargs.get('province')
+                postCode = kwargs.get('postCode')
+                country_name = kwargs.get('country')
+                phone = kwargs.get('phone')
+                is_whatsapp = kwargs.get('isWhatsapp')
+                is_viber = kwargs.get('isViber')
+                is_line = kwargs.get('isLine')
+
+                partner_vals = {}
+                if name:
+                    partner_vals['name'] = name
+                    user.write({'name': name})
+                if phone:
+                    partner_vals['phone'] = phone
+                    partner_vals['mobile'] = phone
+                if address is not None:
+                    partner_vals['street'] = address
+                if city is not None:
+                    partner_vals['city'] = city
+                if postCode is not None:
+                    partner_vals['zip'] = postCode
+                if company is not None:
+                    partner_vals['company_name'] = company
+
+                # Map country
+                if country_name:
+                    country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
+                    if country:
+                        partner_vals['country_id'] = country.id
+
+                # Map state (province)
+                if province:
+                    state_domain = [('name', '=ilike', province)]
+                    if partner_vals.get('country_id'):
+                        state_domain.append(('country_id', '=', partner_vals['country_id']))
+                    elif partner.country_id:
+                        state_domain.append(('country_id', '=', partner.country_id.id))
+                    state = request.env['res.country.state'].sudo().search(state_domain, limit=1)
+                    if state:
+                        partner_vals['state_id'] = state.id
+
+                # Map title
+                if title:
+                    title_rec = request.env['res.partner.title'].sudo().search([('name', '=ilike', title)], limit=1)
+                    if title_rec:
+                        partner_vals['title'] = title_rec.id
+
+                # Map custom boolean fields
+                if 'x_is_whatsapp' in request.env['res.partner']._fields and is_whatsapp is not None:
+                    partner_vals['x_is_whatsapp'] = bool(is_whatsapp)
+                if 'x_is_viber' in request.env['res.partner']._fields and is_viber is not None:
+                    partner_vals['x_is_viber'] = bool(is_viber)
+                if 'x_is_line' in request.env['res.partner']._fields and is_line is not None:
+                    partner_vals['x_is_line'] = bool(is_line)
+
+                if partner_vals:
+                    partner.sudo().write(partner_vals)
+
+            # Return the profile
+            return self._make_json_response({
+                'name': partner.name or '',
+                'title': partner.title.name if partner.title else '',
+                'company': partner.company_name or '',
+                'address': partner.street or '',
+                'city': partner.city or '',
+                'province': partner.state_id.name if partner.state_id else '',
+                'country': partner.country_id.name if partner.country_id else '',
+                'postCode': partner.zip or '',
+                'email': partner.email or '',
+                'phone': partner.phone or partner.mobile or '',
+                'isWhatsapp': getattr(partner, 'x_is_whatsapp', False),
+                'isViber': getattr(partner, 'x_is_viber', False),
+                'isLine': getattr(partner, 'x_is_line', False),
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in member_profile")
+            return self._make_error_response(_("An unexpected error occurred while processing member profile request."), status=500)
+
+    @http.route('/api/v1/website/member/change-password', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def change_password(self, **kwargs):
+        """
+        API Endpoint: Updates password for the currently logged-in user.
+        """
+        try:
+            if not request.session.uid:
+                return self._make_error_response(_("Authentication required."), status=401)
+
+            old_password = kwargs.get('currentPassword')  # Next.js calls it currentPassword
+            new_password = kwargs.get('newPassword')
+
+            if not old_password or not new_password:
+                return self._make_error_response(_("Current password and New password are required."), status=400)
+
+            user = request.env['res.users'].sudo().browse(request.session.uid)
+
+            # Check old password
+            try:
+                user.sudo()._check_credentials(old_password, {'interactive': False})
+            except Exception:
+                return self._make_error_response(_("Incorrect current password."), status=400)
+
+            # Update password
+            user.sudo().write({'password': new_password})
+
+            return self._make_json_response({
+                'message': _("Password updated successfully.")
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in change_password")
+            return self._make_error_response(_("An unexpected error occurred while updating password."), status=500)
+
+    @http.route('/api/v1/website/jobs', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def get_jobs(self, **kwargs):
+        """
+        API Endpoint: Returns active job openings from Odoo pb.job model.
+        """
+        try:
+            records = request.env['pb.job'].sudo().search([('is_active', '=', True)], order='sequence, id')
+            jobs = []
+
+            for record in records:
+                main_duties = [d.strip() for d in (record.main_duties or "").split('\n') if d.strip()]
+                requirements = [r.strip() for r in (record.requirements or "").split('\n') if r.strip()]
+
+                jobs.append({
+                    "id": record.id,
+                    "title": record.name or "",
+                    "description": record.description or record.intro or "",
+                    "companyName": record.company_name or "株式会社パシフィック貿易",
+                    "address": record.address or "",
+                    "industry": record.industry or "自動車",
+                    "jobCategory": record.job_category or "full_time",
+                    "jobTitle": record.job_title or record.name or "",
+                    "employmentType": record.employment_type if hasattr(record, 'employment_type') else ("正社員" if record.job_category == 'full_time' else "パートタイム"),
+                    "location": record.location or "東京都渋谷区",
+                    "workingHours": record.working_hours or "",
+                    "breakTime": record.break_time or "",
+                    "salary": record.salary or "",
+                    "benefits": record.benefits or "",
+                    "workDays": record.work_days or "",
+                    "transportAllowance": record.transport_allowance or "",
+                    "intro": record.intro or record.description or "",
+                    "closingNote": record.closing_note or "",
+                    "mainDuties": main_duties,
+                    "requirements": requirements
+                })
+
+            # If no pb.job records exist in DB yet, fallback to hr.job search or reference jobs
+            if not jobs:
+                hr_records = request.env['hr.job'].sudo().search([('active', '=', True)])
+                for record in hr_records:
+                    jobs.append({
+                        "id": record.id,
+                        "title": record.name or "",
+                        "description": record.description or "",
+                        "companyName": record.company_id.name if record.company_id else "株式会社パシフィック貿易",
+                        "address": record.address_id.contact_address if record.address_id else "東京都渋谷区広尾1-8-9松石ビル201",
+                        "industry": "自動車",
+                        "jobCategory": "full_time" if "仕入れ" in (record.name or "") else "part_time",
+                        "jobTitle": record.name or "",
+                        "employmentType": "正社員" if "仕入れ" in (record.name or "") else "パートタイム",
+                        "location": record.address_id.city or "東京都渋谷区",
+                        "workingHours": "8:00～17:00" if "仕入れ" in (record.name or "") else "10:00～16:00",
+                        "salary": "月給20万円～24万円" if "仕入れ" in (record.name or "") else "時給 1,500円",
+                        "benefits": "交通費全額支給（上限月20,000円迄） 各種社会保険完備",
+                        "intro": record.description or "",
+                        "requirements": [
+                            "基本的なパソコンスキルとオンラインシステムの使用経験",
+                            "社会人経験必須 / 未経験者歓迎"
+                        ]
+                    })
+
+
+            # If no hr.job records exist in DB yet, return the standard reference job positions
+            if not jobs:
+                jobs = [
+                    {
+                        "id": 1,
+                        "title": "仕入れ 募集",
+                        "description": "ネットオークションによる中古車の仕入業務を行います。",
+                        "requirements": [
+                            "簡単なPC操作（インターネットやメールを日頃利用している程度でOK）",
+                            "社会人経験必須",
+                            "＜学歴不問・未経験者歓迎＞"
+                        ],
+                        "companyName": "株式会社パシフィック貿易",
+                        "address": "東京都渋谷区広尾1-8-9松石ビル201",
+                        "industry": "自動車",
+                        "jobCategory": "full_time",
+                        "jobTitle": "中古車の仕入",
+                        "employmentType": "正社員\n＊3か月の試用期間あり。その間はアルバイト雇用（時給1250円）となります。",
+                        "location": "東京都渋谷区広尾1-8-9松石ビル201",
+                        "workingHours": "8:00～17:00",
+                        "salary": "月給20万円～24万円\n※試用期間終了後に、経験、能力などを考慮の上、決定させていただきます。",
+                        "benefits": "交通費全額支給（上限月20,000円迄） 各種社会保険完備（雇用、労災等）",
+                        "intro": "ネットオークションによる中古車の仕入業務を行います。",
+                        "mainDuties": [
+                            "ネットオークションによる中古車の仕入業務",
+                            "海外クライアントの要望に合った中古車を仕入れていただきます。",
+                            "ネット回線によるオークションの為、すべてオフィス内で完結します。",
+                            "車種、年式、型番、予算などの要望を受け、出品されている中古車の中から検索していきま"
+                        ]
+                    },
+                    {
+                        "id": 2,
+                        "title": "パートタイム募集 – 貿易アシスタント",
+                        "description": "海外のお客様との取引を担当する貿易部門をサポートするパートタイムスタッフを募集しています。",
+                        "requirements": [
+                            "基本的なパソコンスキルとオンラインシステムの使用経験",
+                            "必要に応じてインターネット検索ができる能力",
+                            "細かい作業に注意を払える方、整理整頓が得意な方",
+                            "貿易・出荷・物流分野での経験があれば尚可（未経験でも可）"
+                        ],
+                        "jobCategory": "part_time",
+                        "jobTitle": "貿易アシスタント（パートタイム）",
+                        "location": "PACIFICBOEKICO., LTD（パシフィック貿易株式会社）東京都渋谷区",
+                        "intro": "海外のお客様との取引を担当する貿易部門をサポートするパートタイムスタッフを募集しています。少人数のチームと密に連携しながら、日々の業務を円滑に進め、必要な書類処理を担当していただきます。",
+                        "employmentType": "パートタイム",
+                        "workingHours": "10:00～16:00（※面接時に柔軟な調整も可能）",
+                        "breakTime": "1時間",
+                        "salary": "時給 1,500円",
+                        "workDays": "週 4日（火曜～金曜）",
+                        "transportAllowance": "15,000円/月",
+                        "closingNote": "国際的な貿易の現場で実務経験を積みながら、物流・書類作成・顧客対応のスキルを身につける絶好のチャンスです。",
+                        "mainDuties": [
+                            "輸出車両に関する検査申請をオンラインで提出",
+                            "必要書類を海外のお客様へメールで送信",
+                            "書類を正確に社内システムへアップロード",
+                            "システムでの出荷登録を作成",
+                            "陸送会社およびフォワーダーとの配送指示書の確認・フォローアップ",
+                            "フォワーダーとの連絡・出荷調整",
+                            "その他、一般的な事務業務のサポート"
+                        ]
+                    }
+                ]
+
+            return self._make_json_response(jobs)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_jobs")
+            return self._make_error_response(_("An unexpected error occurred while fetching jobs."), status=500)
+
+
 
 
 

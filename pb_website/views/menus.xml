@@ -5,7 +5,7 @@
               name="Website Admin (v1.2)"
               sequence="100"/>
 
-    <!-- Sub-menus -->
+    <!-- Sub-menus: Content -->
     <menuitem id="menu_pb_website_testimonials"
               name="Testimonials"
               parent="menu_pb_website_root"
@@ -17,6 +17,12 @@
               parent="menu_pb_website_root"
               action="action_pb_news"
               sequence="20"/>
+
+    <menuitem id="menu_pb_website_jobs"
+              name="Job Openings"
+              parent="menu_pb_website_root"
+              action="action_pb_job"
+              sequence="30"/>
 
     <menuitem id="menu_pb_website_team_members"
               name="Team Members"
@@ -35,5 +41,40 @@
               parent="menu_pb_website_root"
               action="action_pb_banner"
               sequence="60"/>
-</odoo>
 
+    <menuitem id="menu_pb_website_gallery"
+              name="Photo Gallery"
+              parent="menu_pb_website_root"
+              action="action_pb_gallery"
+              sequence="70"/>
+
+    <!-- Sub-menu Category: Shipping Logistics -->
+    <menuitem id="menu_pb_shipping_root"
+              name="Shipping Schedules"
+              parent="menu_pb_website_root"
+              sequence="80"/>
+
+    <menuitem id="menu_pb_shipping_schedules"
+              name="Voyage Schedules"
+              parent="menu_pb_shipping_root"
+              action="action_shipping_schedule"
+              sequence="10"/>
+
+    <menuitem id="menu_pb_shipping_carriers"
+              name="Carriers"
+              parent="menu_pb_shipping_root"
+              action="action_shipping_carrier"
+              sequence="20"/>
+
+    <menuitem id="menu_pb_shipping_vessels"
+              name="Vessels"
+              parent="menu_pb_shipping_root"
+              action="action_shipping_vessel"
+              sequence="30"/>
+
+    <menuitem id="menu_pb_shipping_ports"
+              name="Ports Master"
+              parent="menu_pb_shipping_root"
+              action="action_shipping_port"
+              sequence="40"/>
+</odoo>

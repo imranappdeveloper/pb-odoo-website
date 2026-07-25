@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================ -->
+    # SHIPPING CARRIER VIEWS
+    <!-- ============================================================ -->
+    <record id="view_shipping_carrier_tree" model="ir.ui.view">
+        <field name="name">shipping.carrier.tree</field>
+        <field name="model">shipping.carrier</field>
+        <field name="arch" type="xml">
+            <tree string="Shipping Carriers">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shipping_carrier_form" model="ir.ui.view">
+        <field name="name">shipping.carrier.form</field>
+        <field name="model">shipping.carrier</field>
+        <field name="arch" type="xml">
+            <form string="Shipping Carrier">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Carrier Name, e.g. Keihin Co., Ltd."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Terms &amp; Restrictions">
+                            <field name="terms_conditions" placeholder="Default carrier terms, pure EV restrictions, certificate requirements..."/>
+                        </page>
+                        <page string="Vessels">
+                            <field name="vessel_ids" readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="imo_number"/>
+                                    <field name="max_deck_height_cm"/>
+                                    <field name="max_cargo_weight_kt"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shipping_carrier" model="ir.actions.act_window">
+        <field name="name">Shipping Carriers</field>
+        <field name="res_model">shipping.carrier</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============================================================ -->
+    # SHIPPING VESSEL VIEWS
+    <!-- ============================================================ -->
+    <record id="view_shipping_vessel_tree" model="ir.ui.view">
+        <field name="name">shipping.vessel.tree</field>
+        <field name="model">shipping.vessel</field>
+        <field name="arch" type="xml">
+            <tree string="Shipping Vessels">
+                <field name="name"/>
+                <field name="carrier_id"/>
+                <field name="imo_number"/>
+                <field name="flag"/>
+                <field name="max_deck_height_cm"/>
+                <field name="max_cargo_weight_kt"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shipping_vessel_form" model="ir.ui.view">
+        <field name="name">shipping.vessel.form</field>
+        <field name="model">shipping.vessel</field>
+        <field name="arch" type="xml">
+            <form string="Shipping Vessel">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Vessel Name, e.g. ARABIAN SEA"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="carrier_id"/>
+                            <field name="imo_number"/>
+                            <field name="flag"/>
+                        </group>
+                        <group>
+                            <field name="max_deck_height_cm"/>
+                            <field name="max_cargo_weight_kt"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" placeholder="Vessel notes, ramp capacity, height limits..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shipping_vessel" model="ir.actions.act_window">
+        <field name="name">Shipping Vessels</field>
+        <field name="res_model">shipping.vessel</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============================================================ -->
+    # SHIPPING PORT VIEWS
+    <!-- ============================================================ -->
+    <record id="view_shipping_port_tree" model="ir.ui.view">
+        <field name="name">shipping.port.tree</field>
+        <field name="model">shipping.port</field>
+        <field name="arch" type="xml">
+            <tree string="Ports">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="country_id"/>
+                <field name="default_role"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shipping_port_form" model="ir.ui.view">
+        <field name="name">shipping.port.form</field>
+        <field name="model">shipping.port</field>
+        <field name="arch" type="xml">
+            <form string="Port">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" placeholder="Port Name, e.g. YOKOHAMA"/>
+                            <field name="code" placeholder="UN/LOCODE e.g. JPYOK"/>
+                        </group>
+                        <group>
+                            <field name="country_id"/>
+                            <field name="default_role"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shipping_port" model="ir.actions.act_window">
+        <field name="name">Ports Master</field>
+        <field name="res_model">shipping.port</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============================================================ -->
+    # SHIPPING SCHEDULE VIEWS
+    <!-- ============================================================ -->
+    <record id="view_shipping_schedule_tree" model="ir.ui.view">
+        <field name="name">shipping.schedule.tree</field>
+        <field name="model">shipping.schedule</field>
+        <field name="arch" type="xml">
+            <tree string="Shipping Schedules">
+                <field name="name"/>
+                <field name="carrier_id"/>
+                <field name="vessel_id"/>
+                <field name="voyage_no"/>
+                <field name="revision_no"/>
+                <field name="issue_date"/>
+                <field name="trade_lane"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_shipping_schedule_form" model="ir.ui.view">
+        <field name="name">shipping.schedule.form</field>
+        <field name="model">shipping.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Shipping Schedule">
+                <header>
+                    <button name="action_open_import_wizard" 
+                            string="Upload / Import Excel Schedule" 
+                            type="object" 
+                            class="btn-primary" 
+                            icon="fa-upload"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" icon="fa-lock" disabled="1">
+                            <div class="o_stat_info">
+                                <field name="lock_version" class="o_stat_value"/>
+                                <span class="o_stat_text">Lock Version</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="carrier_id"/>
+                            <field name="vessel_id" domain="[('carrier_id', '=', carrier_id)]"/>
+                            <field name="voyage_no"/>
+                            <field name="revision_no"/>
+                        </group>
+                        <group>
+                            <field name="issue_date"/>
+                            <field name="trade_lane"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Cargo Rules &amp; Restrictions">
+                        <group>
+                            <field name="allow_ev"/>
+                            <field name="allow_hybrid"/>
+                            <field name="require_nkkk"/>
+                        </group>
+                        <group>
+                            <field name="cargo_restrictions" placeholder="Special restrictions, e.g. No pure EV/Hydrogen; Hybrid allowed..."/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Port Calls &amp; Dates">
+                            <field name="line_ids">
+                                <tree editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="call_type"/>
+                                    <field name="port_id"/>
+                                    <field name="eta"/>
+                                    <field name="etd"/>
+                                    <field name="eta_end"/>
+                                    <field name="etd_end"/>
+                                    <field name="status" widget="badge" 
+                                           decoration-info="status == 'scheduled'"
+                                           decoration-warning="status == 'in_transit'"
+                                           decoration-success="status == 'completed'"
+                                           decoration-danger="status == 'skipped'"/>
+                                    <field name="remarks"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shipping_schedule_search" model="ir.ui.view">
+        <field name="name">shipping.schedule.search</field>
+        <field name="model">shipping.schedule</field>
+        <field name="arch" type="xml">
+            <search string="Search Shipping Schedules">
+                <field name="voyage_no"/>
+                <field name="carrier_id"/>
+                <field name="vessel_id"/>
+                <field name="trade_lane"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Carrier" name="group_carrier" context="{'group_by': 'carrier_id'}"/>
+                    <filter string="Vessel" name="group_vessel" context="{'group_by': 'vessel_id'}"/>
+                    <filter string="Trade Lane" name="group_tradelane" context="{'group_by': 'trade_lane'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shipping_schedule" model="ir.actions.act_window">
+        <field name="name">Shipping Schedules</field>
+        <field name="res_model">shipping.schedule</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_shipping_schedule_search"/>
+    </record>
+
+    <!-- ============================================================ -->
+    # EXCEL IMPORT WIZARD VIEW
+    <!-- ============================================================ -->
+    <record id="view_shipping_schedule_import_wizard_form" model="ir.ui.view">
+        <field name="name">shipping.schedule.import.wizard.form</field>
+        <field name="model">shipping.schedule.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Shipping Schedule from Excel">
+                <sheet>
+                    <group>
+                        <group string="File Upload">
+                            <field name="file_data" filename="file_name"/>
+                            <field name="file_name" invisible="1"/>
+                            <field name="mode"/>
+                        </group>
+                        <group string="Schedule Metadata">
+                            <field name="carrier_id"/>
+                            <field name="vessel_id" domain="[('carrier_id', '=', carrier_id)]"/>
+                            <field name="voyage_no"/>
+                            <field name="revision_no"/>
+                            <field name="trade_lane"/>
+                            <field name="expected_lock_version" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_import" string="Import / Update" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

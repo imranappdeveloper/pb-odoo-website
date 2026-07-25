@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Pacific Boeki Website API & Core',
-    'version': '1.2',
+    'version': '1.3',
     'category': 'Website/Website',
     'summary': 'API endpoints and custom models for Pacific Boeki Next.js website integration.',
     'description': """
@@ -17,6 +17,10 @@ and JSON-RPC controllers to expose catalog data to the Next.js static website.
         'views/team_member_views.xml',
         'views/recruitment_inquiry_views.xml',
         'views/banner_views.xml',
+        'views/job_views.xml',
+        'views/gallery_views.xml',
+        'views/model_discount_views.xml',
+        'views/shipping_views.xml',
         'views/menus.xml',
     ],
     'post_init_hook': 'post_init_hook',
