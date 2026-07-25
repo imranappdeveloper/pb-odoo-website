@@ -11,8 +11,5 @@ from . import banner
 from . import job
 from . import gallery
 from . import model_discount
-from . import shipping_carrier
-from . import shipping_vessel
-from . import shipping_port
 from . import shipping_schedule
 from . import shipping_schedule_import_wizard

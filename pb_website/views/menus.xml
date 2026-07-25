@@ -60,21 +60,9 @@
               action="action_shipping_schedule"
               sequence="10"/>
 
-    <menuitem id="menu_pb_shipping_carriers"
-              name="Carriers"
+    <menuitem id="menu_pb_shipping_import_wizard"
+              name="Upload / Import Excel"
               parent="menu_pb_shipping_root"
-              action="action_shipping_carrier"
-              sequence="20"/>
-
-    <menuitem id="menu_pb_shipping_vessels"
-              name="Vessels"
-              parent="menu_pb_shipping_root"
-              action="action_shipping_vessel"
-              sequence="30"/>
-
-    <menuitem id="menu_pb_shipping_ports"
-              name="Ports Master"
-              parent="menu_pb_shipping_root"
-              action="action_shipping_port"
-              sequence="40"/>
+              action="action_shipping_schedule_import_wizard"
+              sequence="15"/>
 </odoo>

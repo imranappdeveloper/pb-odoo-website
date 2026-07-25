@@ -15,12 +15,6 @@ access_pb_gallery_public,pb.gallery,model_pb_gallery,base.group_portal,1,0,0,0
 access_pb_gallery_user,pb.gallery,model_pb_gallery,base.group_user,1,1,1,1
 access_pb_model_discount_public,pb.model.discount,model_pb_model_discount,base.group_portal,1,0,0,0
 access_pb_model_discount_user,pb.model.discount,model_pb_model_discount,base.group_user,1,1,1,1
-access_shipping_carrier_public,shipping.carrier,model_shipping_carrier,base.group_portal,1,0,0,0
-access_shipping_carrier_user,shipping.carrier,model_shipping_carrier,base.group_user,1,1,1,1
-access_shipping_vessel_public,shipping.vessel,model_shipping_vessel,base.group_portal,1,0,0,0
-access_shipping_vessel_user,shipping.vessel,model_shipping_vessel,base.group_user,1,1,1,1
-access_shipping_port_public,shipping.port,model_shipping_port,base.group_portal,1,0,0,0
-access_shipping_port_user,shipping.port,model_shipping_port,base.group_user,1,1,1,1
 access_shipping_schedule_public,shipping.schedule,model_shipping_schedule,base.group_portal,1,0,0,0
 access_shipping_schedule_user,shipping.schedule,model_shipping_schedule,base.group_user,1,1,1,1
 access_shipping_schedule_line_public,shipping.schedule.line,model_shipping_schedule_line,base.group_portal,1,0,0,0

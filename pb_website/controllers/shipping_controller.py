@@ -6,11 +6,11 @@ from odoo.http import request
 class ShippingScheduleController(http.Controller):
 
     @http.route('/api/v1/website/shipping-schedules', type='json', auth='public', methods=['POST', 'GET'], csrf=False)
-    def get_shipping_schedules(self, origin_port=None, dest_port=None, carrier_code=None, trade_lane=None, **kw):
-        """Public API endpoint returning active shipping schedules with port calls and vessel details."""
+    def get_shipping_schedules(self, origin_port=None, dest_port=None, carrier_name=None, trade_lane=None, **kw):
+        """Public API endpoint returning active shipping schedules with port calls."""
         domain = [('active', '=', True)]
-        if carrier_code:
-            domain.append(('carrier_id.code', '=ilike', carrier_code))
+        if carrier_name:
+            domain.append(('carrier_name', '=ilike', carrier_name))
         if trade_lane:
             domain.append(('trade_lane', '=ilike', trade_lane))
 
@@ -23,8 +23,11 @@ class ShippingScheduleController(http.Controller):
             matched_dest = False
 
             for line in sched.line_ids:
-                is_origin = (origin_port and line.port_id.code.upper() == origin_port.upper())
-                is_dest = (dest_port and line.port_id.code.upper() == dest_port.upper())
+                p_code = line.port_code or ''
+                p_name = line.port_name or ''
+                is_origin = (origin_port and (p_code.upper() == origin_port.upper() or origin_port.upper() in p_name.upper()))
+                is_dest = (dest_port and (p_code.upper() == dest_port.upper() or dest_port.upper() in p_name.upper()))
+                
                 if is_origin:
                     matched_origin = True
                 if is_dest:
@@ -34,9 +37,8 @@ class ShippingScheduleController(http.Controller):
                     'id': line.id,
                     'sequence': line.sequence,
                     'call_type': line.call_type,
-                    'port_name': line.port_id.name,
-                    'port_code': line.port_id.code,
-                    'country': line.port_id.country_id.name if line.port_id.country_id else None,
+                    'port_name': line.port_name,
+                    'port_code': line.port_code,
                     'eta': line.eta.isoformat() if line.eta else None,
                     'etd': line.etd.isoformat() if line.etd else None,
                     'eta_end': line.eta_end.isoformat() if line.eta_end else None,
@@ -54,16 +56,8 @@ class ShippingScheduleController(http.Controller):
             result.append({
                 'id': sched.id,
                 'name': sched.name,
-                'carrier': {
-                    'name': sched.carrier_id.name,
-                    'code': sched.carrier_id.code,
-                },
-                'vessel': {
-                    'name': sched.vessel_id.name,
-                    'imo_number': sched.vessel_id.imo_number,
-                    'max_deck_height_cm': sched.vessel_id.max_deck_height_cm,
-                    'max_cargo_weight_kt': sched.vessel_id.max_cargo_weight_kt,
-                },
+                'carrier_name': sched.carrier_name,
+                'vessel_name': sched.vessel_name,
                 'voyage_no': sched.voyage_no,
                 'revision_no': sched.revision_no,
                 'issue_date': sched.issue_date.isoformat() if sched.issue_date else None,
