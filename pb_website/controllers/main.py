@@ -60,6 +60,62 @@ class WebsiteCatalogController(http.Controller):
         """
         return self._make_json_response({'message': message}, status=status)
 
+    def _get_email_params(self):
+        """
+        Helper to fetch email system parameters with proper fallbacks:
+        - default_email (sender address & default fallback)
+        - default_email_sales (inbound sales/contact inquiries)
+        - default_email_job (inbound job/recruitment inquiries)
+        """
+        ir_config = request.env['ir.config_parameter'].sudo()
+        default_email = ir_config.get_param('pb_website.default_email') or 'info@pacificboeki.jp'
+        default_email_sales = ir_config.get_param('pb_website.default_email_sales') or default_email
+        default_email_job = ir_config.get_param('pb_website.default_email_job') or default_email
+
+        # Sync mail.default.from with default_email
+        current_default_from = ir_config.get_param('mail.default.from')
+        if current_default_from != default_email:
+            ir_config.set_param('mail.default.from', default_email)
+
+        return {
+            'default_email': default_email,
+            'default_email_sales': default_email_sales,
+            'default_email_job': default_email_job,
+        }
+
+    def _get_common_mail_footer(self, email_sender=None):
+        """
+        Returns standard common email footer HTML consistent with auction module.
+        """
+        if not email_sender:
+            email_params = self._get_email_params()
+            email_sender = email_params['default_email']
+
+        return f"""
+        <div style="margin-top: 25px; color: #34495E; font-size: 13px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+            <strong>Thanks &amp; Regards,</strong><br/>
+            Pacific Boeki Sales Team<br/>
+        </div>
+        <div style="margin-top: 15px; border-left: 4px solid #BA3308; padding-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+            <div style="margin-bottom: 15px;">
+                <a href="https://www.pacificboeki.jp" target="_blank">
+                    <img src="https://pacificboekiac.jp/web/image/website/1/logo/My%20Website?unique=9e28042" style="max-height: 60px; width: auto;"/>
+                </a>
+                <br/>
+            </div>
+            
+            <div style="color: #34495E; font-size: 13px; line-height: 1.6;">
+                Pacific Boeki Co. Ltd.<br/>
+                Shibuya-Ku, Hiroo 1-8-9, Matsuishi Building 201,<br/>
+                Tokyo, 150-0012 Tokyo Japan<br/>
+                <strong>Phone:</strong> +81-3-5798-7681 | <strong>Fax:</strong> +81-3-5798-7682<br/>
+                <strong>E-Mail:</strong> <a href="mailto:{email_sender}" style="text-decoration:none; color: #BA3308;">{email_sender}</a><br/>
+                <strong>Web:</strong> <a href="http://www.pacificboeki.jp" target="_blank" style="text-decoration:none; color: #BA3308;">www.pacificboeki.jp</a>
+            </div>
+        </div>
+        """
+
+
     @http.route('/api/v1/website/search-options', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_search_options(self, **kwargs):
         """
@@ -98,9 +154,23 @@ class WebsiteCatalogController(http.Controller):
                     if car.name not in models_mapping[maker_name]:
                         models_mapping[maker_name].append(car.name)
 
+            # Model codes (chassis prefixes before hyphen)
+            model_codes_set = set()
+            try:
+                templates = request.env['product.template'].sudo().search([('state', '=', '1_draft')])
+                for tmpl in templates:
+                    raw_name = tmpl.name or ''
+                    if '-' in raw_name:
+                        code = raw_name.split('-')[0].strip()
+                        if code:
+                            model_codes_set.add(code)
+            except Exception:
+                pass
+
             options = {
                 "makes": sorted(makes),
                 "models": models_mapping,
+                "model_codes": sorted(list(model_codes_set)),
                 "categories": sorted(body_types),
                 "body_types": sorted(body_types),
                 "transmissions": sorted(transmissions),
@@ -128,12 +198,40 @@ class WebsiteCatalogController(http.Controller):
                     "country": record.country or "",
                     "rating": record.rating,
                     "text": record.text or "",
-                    "photoUrl": f"/web/image/pb.testimonial/{record.id}/photo" if record.photo else "/images/default-avatar.png"
+                    "photoUrl": f"data:image/jpeg;base64,{record.photo.decode('utf-8')}" if record.photo else "/images/default-avatar.png"
                 })
             return self._make_json_response(testimonials)
         except Exception as e:
             _logger.exception("Unexpected error in get_testimonials")
             return self._make_error_response(_("An unexpected error occurred while fetching testimonials."), status=500)
+
+    @http.route(['/api/v1/website/banner/image/<int:banner_id>', '/web/image/pb.banner/<int:banner_id>/image'], type='http', auth='public', methods=['GET'], csrf=False, cors='*')
+    def get_banner_image(self, banner_id, **kwargs):
+        try:
+            banner = request.env['pb.banner'].sudo().browse(banner_id)
+            if banner.exists() and banner.image:
+                image_data = base64.b64decode(banner.image)
+                return request.make_response(image_data, [
+                    ('Content-Type', 'image/jpeg'),
+                    ('Cache-Control', 'public, max-age=86400')
+                ])
+        except Exception:
+            _logger.exception("Error serving banner image")
+        return request.not_found()
+
+    @http.route(['/api/v1/website/news/image/<int:news_id>', '/web/image/pb.news/<int:news_id>/thumbnail'], type='http', auth='public', methods=['GET'], csrf=False, cors='*')
+    def get_news_image(self, news_id, **kwargs):
+        try:
+            news = request.env['pb.news'].sudo().browse(news_id)
+            if news.exists() and news.thumbnail:
+                image_data = base64.b64decode(news.thumbnail)
+                return request.make_response(image_data, [
+                    ('Content-Type', 'image/jpeg'),
+                    ('Cache-Control', 'public, max-age=86400')
+                ])
+        except Exception:
+            _logger.exception("Error serving news image")
+        return request.not_found()
 
     @http.route('/api/v1/website/banners', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_banners(self, **kwargs):
@@ -147,7 +245,7 @@ class WebsiteCatalogController(http.Controller):
                 banners.append({
                     "id": record.id,
                     "name": record.name,
-                    "imageUrl": f"/web/image/pb.banner/{record.id}/image" if record.image else "",
+                    "imageUrl": f"data:image/jpeg;base64,{record.image.decode('utf-8')}" if record.image else "",
                     "sequence": record.sequence,
                     "isActive": record.is_active,
                     "title": record.title or "",
@@ -171,8 +269,8 @@ class WebsiteCatalogController(http.Controller):
                 images.append({
                     "id": record.id,
                     "name": record.name,
-                    "imageUrl": f"/web/image/pb.gallery/{record.id}/image" if record.image else "",
-                    "mediumUrl": f"/web/image/pb.gallery/{record.id}/image_medium" if record.image_medium else "",
+                    "imageUrl": f"data:image/jpeg;base64,{record.image.decode('utf-8')}" if record.image else "",
+                    "mediumUrl": f"data:image/jpeg;base64,{record.image_medium.decode('utf-8')}" if record.image_medium else "",
                     "sequence": record.sequence,
                     "isActive": record.is_active
                 })
@@ -259,7 +357,103 @@ class WebsiteCatalogController(http.Controller):
                 vals['dob'] = dob
 
             inquiry = request.env['pb.recruitment_inquiry'].sudo().create(vals)
+
+            # Send recruitment emails (HR notification & candidate confirmation)
+            try:
+                email_params = self._get_email_params()
+                job_email = email_params['default_email_job']
+                from_email = email_params['default_email']
+
+                recruitment_labels = {
+                    'career': 'Career Recruitment',
+                    'local': 'Local Career Recruitment',
+                    'agent': 'Local Agent / Contract'
+                }
+                category_label = recruitment_labels.get(recruitment_type, recruitment_type)
+
+                # Create PDF attachment for HR email if resume exists
+                attachment_ids = []
+                if resume_base64:
+                    try:
+                        attachment = request.env['ir.attachment'].sudo().create({
+                            'name': resume_filename or 'resume.pdf',
+                            'datas': resume_base64,
+                            'res_model': 'mail.mail',
+                            'res_id': 0,
+                            'type': 'binary',
+                            'mimetype': 'application/pdf',
+                        })
+                        attachment_ids.append(attachment.id)
+                    except Exception as att_err:
+                        _logger.warning("Failed to attach resume PDF for job application: %s", att_err)
+
+                # 1. Internal HR Notification Email (To: default_email_job)
+                hr_mail_vals = {
+                    'subject': f"新規求人応募: {name} 様 ({category_label})",
+                    'body_html': f"""
+                        <div style="font-family: Arial, sans-serif; padding: 15px;">
+                            <h3 style="color: #c8102e;">新規求人応募を受信しました</h3>
+                            <p><strong>氏名:</strong> {name}</p>
+                            <p><strong>メールアドレス:</strong> {email}</p>
+                            <p><strong>電話番号:</strong> {phone}</p>
+                            <p><strong>生年月日:</strong> {dob or '未入力'}</p>
+                            <p><strong>住所:</strong> {street_address or '未入力'}</p>
+                            <p><strong>応募区分:</strong> {category_label}</p>
+                            <p><strong>メッセージ:</strong></p>
+                            <blockquote style="background: #f9f9f9; border-left: 3px solid #c8102e; padding: 10px; margin: 0;">
+                                {message}
+                            </blockquote>
+                        </div>
+                        {self._get_common_mail_footer(from_email)}
+                    """,
+                    'email_to': job_email,
+                    'email_from': f"Pacific Boeki <{from_email}>",
+                    'reply_to': email,
+                    'state': 'outgoing',
+                }
+                if attachment_ids:
+                    hr_mail_vals['attachment_ids'] = [(6, 0, attachment_ids)]
+
+                hr_mail = request.env['mail.mail'].sudo().create(hr_mail_vals)
+                hr_mail.send()
+
+                # 2. Candidate Confirmation Email (To: Candidate email)
+                candidate_mail_vals = {
+                    'subject': "求人応募を受け付けました",
+                    'body_html': f"""
+                    <div style="font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; padding: 20px; line-height: 1.8; color: #333333;">
+                        <p style="font-size: 16px; font-weight: bold;">{name} 様</p>
+                        <p>この度は、Pacific Boeki の求人にご応募いただき、誠にありがとうございます。</p>
+                        <p>ご応募内容および履歴書を正常に受け付けました。<br />
+                        採用担当者が内容を確認し、選考を進めさせていただきます。応募内容が募集条件に適している場合は、次の選考についてご連絡いたします。</p>
+                        <div style="background: #f9f9f9; border: 1px solid #eeeeee; padding: 16px; border-radius: 6px; margin: 20px 0;">
+                            <h4 style="margin-top: 0; color: #c8102e; border-bottom: 1px solid #ddd; padding-bottom: 8px;">応募内容</h4>
+                            <p style="margin: 6px 0;"><strong>氏名:</strong> {name}</p>
+                            <p style="margin: 6px 0;"><strong>メールアドレス:</strong> {email}</p>
+                            <p style="margin: 6px 0;"><strong>電話番号:</strong> {phone}</p>
+                            <p style="margin: 6px 0;"><strong>生年月日:</strong> {dob or '未入力'}</p>
+                            <p style="margin: 6px 0;"><strong>住所:</strong> {street_address or '未入力'}</p>
+                            <p style="margin: 6px 0;"><strong>応募区分:</strong> {category_label}</p>
+                            <p style="margin: 6px 0;"><strong>メッセージ:</strong> {message}</p>
+                            <p style="margin: 6px 0;"><strong>履歴書（PDF）:</strong> 正常に受領しております。</p>
+                        </div>
+                        <p>この度は、Pacific Boeki にご関心をお寄せいただき、誠にありがとうございます。<br />
+                        今後ともどうぞよろしくお願いいたします。</p>
+                    </div>
+                    {self._get_common_mail_footer(from_email)}
+                    """,
+                    'email_to': email,
+                    'email_from': f"Pacific Boeki <{from_email}>",
+                    'reply_to': job_email,
+                    'state': 'outgoing',
+                }
+                cand_mail = request.env['mail.mail'].sudo().create(candidate_mail_vals)
+                cand_mail.send()
+            except Exception as mail_err:
+                _logger.warning("Failed to dispatch recruitment notification emails: %s", mail_err)
+
             return self._make_json_response({'success': True, 'id': inquiry.id})
+
         except Exception as e:
             _logger.exception("Unexpected error in submit_recruitment_inquiry")
             return self._make_error_response(_("An unexpected error occurred while submitting recruitment inquiry."), status=500)
@@ -279,7 +473,7 @@ class WebsiteCatalogController(http.Controller):
                     "id": record.id,
                     "title": record.title,
                     "body": record.body or "",
-                    "thumbnail": f"/web/image/pb.news/{record.id}/thumbnail" if record.thumbnail else "",
+                    "thumbnail": f"data:image/jpeg;base64,{record.thumbnail.decode('utf-8')}" if record.thumbnail else "",
                     "date": record.date,
                     "published": record.published
                 })
@@ -291,7 +485,7 @@ class WebsiteCatalogController(http.Controller):
                     "id": record.id,
                     "title": record.title,
                     "body": record.body or "",
-                    "thumbnail": f"/web/image/pb.news/{record.id}/thumbnail" if record.thumbnail else "",
+                    "thumbnail": f"data:image/jpeg;base64,{record.thumbnail.decode('utf-8')}" if record.thumbnail else "",
                     "date": record.date,
                     "published": record.published
                 })
@@ -341,6 +535,7 @@ class WebsiteCatalogController(http.Controller):
                     "grade": record.grade or "4.5",
                     "fobPriceUsd": record.fob_price or 0,
                     "fobPriceJpy": record.final_fob_price or 0,
+                    "priceCurrency": "JPY",
                     "stockLocation": record.stock_location.name if hasattr(record, 'stock_location') and record.stock_location else "Yokohama, Japan",
                     "imageUrls": image_urls,
                     "isFeatured": record.is_featured or False,
@@ -481,6 +676,7 @@ class WebsiteCatalogController(http.Controller):
                     "grade": record.grade or "4.5",
                     "fobPriceUsd": record.fob_price or 0,
                     "fobPriceJpy": record.final_fob_price or 0,
+                    "priceCurrency": "JPY",
                     "stockLocation": record.stock_location.name if hasattr(record, 'stock_location') and record.stock_location else "Yokohama, Japan",
                     "imageUrls": image_urls,
                     "isFeatured": record.is_featured or False,
@@ -581,6 +777,7 @@ class WebsiteCatalogController(http.Controller):
                 "grade": record.grade or "4.5",
                 "fobPriceUsd": record.fob_price or 0,
                 "fobPriceJpy": record.final_fob_price or 0,
+                "priceCurrency": "JPY",
                 "stockLocation": record.stock_location.name if hasattr(record, 'stock_location') and record.stock_location else "Yokohama, Japan",
                 "imageUrls": image_urls,
                 "isFeatured": record.is_featured or False,
@@ -609,7 +806,8 @@ class WebsiteCatalogController(http.Controller):
                     "id": port.id,
                     "country": port.country_of_port.name if port.country_of_port else "",
                     "port": port.name,
-                    "ratePerM3": port.default_cost or 0.0
+                    "ratePerM3": port.default_cost or 0.0,
+                    "currency": "USD"
                 })
             return self._make_json_response(rates)
         except Exception as e:
@@ -690,36 +888,50 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Initiates Odoo password reset flow and returns standard or offline reset link.
         """
         try:
-            email = kwargs.get('email')
+            email = (kwargs.get('email') or kwargs.get('login') or '').strip()
             if not email:
                 return self._make_error_response(_("Email ID/Login ID is required."), status=400)
 
-            user = request.env['res.users'].sudo().search([('login', '=', email)], limit=1)
+            # Search user by login or email address case-insensitively
+            user = request.env['res.users'].sudo().search([
+                '|', ('login', '=ilike', email), ('email', '=ilike', email)
+            ], limit=1)
+
             if not user:
                 return self._make_error_response(_("No member account found with this email ID."), status=404)
 
-            # Generate Odoo reset password token and URL
             partner = user.partner_id
-            partner.sudo().signup_prepare(signup_type='reset')
-            reset_url = partner.signup_url
+            if partner and not partner.email:
+                partner.sudo().write({'email': email})
 
-            # Attempt sending reset password email
+            reset_url = False
+            email_sent = False
+
+            # Generate Odoo reset password token & URL
+            try:
+                if partner:
+                    partner.sudo().signup_prepare(signup_type='reset')
+                    reset_url = getattr(partner, 'signup_url', False)
+            except Exception as token_err:
+                _logger.warning("Token preparation note: %s", str(token_err))
+
+            # Attempt sending reset password email natively via Odoo
             try:
                 user.sudo().action_reset_password()
                 email_sent = True
             except Exception as mail_err:
-                _logger.warning("Failed to send reset email: %s. Proceeding with local token response.", str(mail_err))
+                _logger.warning("Failed to send reset email via SMTP: %s.", str(mail_err))
                 email_sent = False
 
             return self._make_json_response({
                 'message': _("Your password reset link has been sent to your email ID !!"),
                 'email': email,
-                'reset_url': reset_url,  # Local dev utility
+                'reset_url': reset_url,
                 'email_sent': email_sent
             })
 
         except Exception as e:
-            _logger.exception("Unexpected error in forgot_password")
+            _logger.exception("Unexpected error in forgot_password: %s", str(e))
             return self._make_error_response(_("An unexpected error occurred while processing password reset request."), status=500)
 
     @http.route('/api/v1/website/contact', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
@@ -767,6 +979,39 @@ class WebsiteCatalogController(http.Controller):
             }
             lead = request.env['crm.lead'].sudo().create(lead_vals)
 
+            # Get configured sales email and sender email
+            email_params = self._get_email_params()
+            sales_email = email_params['default_email_sales']
+            from_email = email_params['default_email']
+
+            # Create mail.mail email record for contact inquiry
+            try:
+                mail_vals = {
+                    'subject': f"Website Contact: {name}",
+                    'body_html': f"""
+                        <div style="font-family: Arial, sans-serif; padding: 15px;">
+                            <h3 style="color: #c8102e;">New Website Contact Inquiry</h3>
+                            <p><strong>Name:</strong> {contact_name}</p>
+                            <p><strong>Email:</strong> {email}</p>
+                            <p><strong>Phone:</strong> {phone or 'N/A'}</p>
+                            <p><strong>Country:</strong> {country_name or 'N/A'}</p>
+                            <p><strong>Message:</strong></p>
+                            <blockquote style="background: #f9f9f9; border-left: 3px solid #c8102e; padding: 10px; margin: 0;">
+                                {msg}
+                            </blockquote>
+                        </div>
+                        {self._get_common_mail_footer(from_email)}
+                    """,
+                    'email_to': sales_email,
+                    'email_from': f"Pacific Boeki <{from_email}>",
+                    'reply_to': email,
+                    'state': 'outgoing',
+                }
+                mail = request.env['mail.mail'].sudo().create(mail_vals)
+                mail.send()
+            except Exception as mail_err:
+                _logger.warning("Failed to create mail.mail record for contact lead: %s", mail_err)
+
             return self._make_json_response({
                 'message': _("Thank you for contacting us! We will get back to you soon."),
                 'lead_id': lead.id
@@ -775,6 +1020,138 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in contact")
             return self._make_error_response(_("An unexpected error occurred while submitting contact form."), status=500)
+
+    @http.route('/api/v1/website/email/send', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    def send_email(self, **kwargs):
+        """
+        API Endpoint: Common setup for sending emails via Odoo.
+        Creates mail.mail records for outbound processing and tracking.
+        """
+        try:
+            template_code = kwargs.get('template')
+            recipient_email = kwargs.get('recipient_email')
+            reply_to = kwargs.get('reply_to')
+            data = kwargs.get('data') or {}
+
+            if not template_code or not data:
+                return self._make_error_response(_("Template code and data are required."), status=400)
+
+            # Retrieve dynamic notification email system parameters
+            email_params = self._get_email_params()
+            default_email = email_params['default_email']
+            sales_email = email_params['default_email_sales']
+            job_email = email_params['default_email_job']
+
+            subject = data.get('subject') or f"Website Notification: {template_code.replace('_', ' ').title()}"
+
+            if data.get('is_applicant_confirmation'):
+                subject = "求人応募を受け付けました"
+                name = data.get('name', '')
+                email_val = data.get('email', '')
+                phone_val = data.get('phone', '')
+                dob_val = data.get('dob', '') or '未入力'
+                address_val = data.get('street_address', '') or '未入力'
+                category_val = data.get('recruitment_type_label') or data.get('position') or '採用応募'
+                message_val = data.get('cover_letter') or data.get('message') or ''
+
+                body_html = f"""
+                <div style="font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; padding: 20px; line-height: 1.8; color: #333333;">
+                    <p style="font-size: 16px; font-weight: bold;">{name} 様</p>
+                    <p>この度は、Pacific Boeki の求人にご応募いただき、誠にありがとうございます。</p>
+                    <p>ご応募内容および履歴書を正常に受け付けました。<br />
+                    採用担当者が内容を確認し、選考を進めさせていただきます。応募内容が募集条件に適している場合は、次の選考についてご連絡いたします。</p>
+                    <div style="background: #f9f9f9; border: 1px solid #eeeeee; padding: 16px; border-radius: 6px; margin: 20px 0;">
+                        <h4 style="margin-top: 0; color: #c8102e; border-bottom: 1px solid #ddd; padding-bottom: 8px;">応募内容</h4>
+                        <p style="margin: 6px 0;"><strong>氏名:</strong> {name}</p>
+                        <p style="margin: 6px 0;"><strong>メールアドレス:</strong> {email_val}</p>
+                        <p style="margin: 6px 0;"><strong>電話番号:</strong> {phone_val}</p>
+                        <p style="margin: 6px 0;"><strong>生年月日:</strong> {dob_val}</p>
+                        <p style="margin: 6px 0;"><strong>住所:</strong> {address_val}</p>
+                        <p style="margin: 6px 0;"><strong>応募区分:</strong> {category_val}</p>
+                        <p style="margin: 6px 0;"><strong>メッセージ:</strong> {message_val}</p>
+                        <p style="margin: 6px 0;"><strong>履歴書（PDF）:</strong> 正常に受領しております。</p>
+                    </div>
+                    <p>この度は、Pacific Boeki にご関心をお寄せいただき、誠にありがとうございます。<br />
+                    今後ともどうぞよろしくお願いいたします。</p>
+                </div>
+                """
+            else:
+                excluded_keys = ['subject', 'is_applicant_confirmation', 'resume_base64']
+                body_html = f"""
+                <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
+                    <h2 style="color: #c8102e;">Pacific Boeki — {template_code.replace('_', ' ').title()}</h2>
+                    <hr style="border: 0; border-top: 1px solid #eeeeee;" />
+                    <table style="width: 100%; border-collapse: collapse;">
+                """
+                for key, val in data.items():
+                    if val and key not in excluded_keys:
+                        label = key.replace('_', ' ').title()
+                        body_html += f"<tr><td style='padding: 8px; font-weight: bold; width: 30%; border-bottom: 1px solid #f0f0f0;'>{label}:</td><td style='padding: 8px; border-bottom: 1px solid #f0f0f0;'>{val}</td></tr>"
+                body_html += f"""
+                    </table>
+                </div>
+                {self._get_common_mail_footer(default_email)}
+                """
+
+            # Determine email recipient based on template context
+            is_customer_facing = template_code in ['welcome_member'] or data.get('is_applicant_confirmation')
+            is_job_template = 'job' in template_code or 'recruitment' in template_code
+
+            if recipient_email:
+                email_to = recipient_email
+            elif is_customer_facing:
+                email_to = data.get('email') or default_email
+            elif is_job_template:
+                email_to = job_email
+            else:
+                email_to = sales_email
+
+            email_from = f"Pacific Boeki <{default_email}>"
+            customer_reply_to = reply_to or data.get('email') or default_email
+
+
+            attachment_ids = []
+            resume_base64 = data.get('resume_base64')
+            resume_filename = data.get('resume_filename') or 'resume.pdf'
+            if resume_base64:
+                try:
+                    attachment = request.env['ir.attachment'].sudo().create({
+                        'name': resume_filename,
+                        'datas': resume_base64,
+                        'res_model': 'mail.mail',
+                        'res_id': 0,
+                        'type': 'binary',
+                        'mimetype': 'application/pdf',
+                    })
+                    attachment_ids.append(attachment.id)
+                except Exception as att_err:
+                    _logger.warning("Failed to create PDF attachment for email: %s", att_err)
+
+            mail_vals = {
+                'subject': subject,
+                'body_html': body_html,
+                'email_to': email_to,
+                'email_from': email_from,
+                'reply_to': customer_reply_to,
+                'state': 'outgoing',
+            }
+
+            if attachment_ids:
+                mail_vals['attachment_ids'] = [(6, 0, attachment_ids)]
+
+            mail = request.env['mail.mail'].sudo().create(mail_vals)
+            mail.send()
+
+            return self._make_json_response({
+                'status': 'success',
+                'message_id': mail.id,
+                'message': _("Email created and queued successfully.")
+            })
+
+        except Exception as e:
+            _logger.exception("Unexpected error in send_email")
+            return self._make_error_response(_("An unexpected error occurred while sending email."), status=500)
+
 
     @http.route('/api/v1/website/member/profile', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def member_profile(self, **kwargs):
@@ -1037,6 +1414,51 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Unexpected error in get_jobs")
             return self._make_error_response(_("An unexpected error occurred while fetching jobs."), status=500)
+
+    @http.route('/api/v1/website/currencies', type='json', auth='public', methods=['POST', 'GET'], csrf=False, cors='*')
+    def get_website_currencies(self, **kwargs):
+        """
+        API Endpoint: Returns active exchange rates from Odoo res.currency model.
+        """
+        try:
+            currencies = request.env['res.currency'].sudo().search([('active', '=', True)])
+            default_live_rates = {
+                'USD': 1.0,
+                'JPY': 163.83,
+                'SLR': 336.21,
+                'GBP': 0.75,
+                'EUR': 0.88
+            }
+            rates = dict(default_live_rates)
+            currency_list = []
+
+            usd = request.env['res.currency'].sudo().search([('name', '=', 'USD')], limit=1)
+            usd_rate = usd.rate if usd and usd.rate > 0 else 1.0
+
+            for curr in currencies:
+                code = curr.name.upper()
+                if code in ['USD', 'JPY', 'SLR', 'LKR', 'GBP', 'EUR']:
+                    rate_val = (curr.rate / usd_rate) if (usd_rate and curr.rate > 0) else 1.0
+                    target_code = 'SLR' if code in ['SLR', 'LKR'] else code
+                    if rate_val != 1.0 or target_code == 'USD':
+                        rates[target_code] = round(rate_val, 4)
+
+            for code, rate in rates.items():
+                currency_list.append({
+                    'code': code,
+                    'symbol': '¥' if code == 'JPY' else ('$' if code == 'USD' else ('SLR ' if code == 'SLR' else ('£' if code == 'GBP' else '€'))),
+                    'name': code,
+                    'rateToUsd': rate
+                })
+
+            return self._make_json_response({
+                'base': 'USD',
+                'rates': rates,
+                'currencies': currency_list
+            })
+        except Exception as e:
+            _logger.exception("Error in get_website_currencies")
+            return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
 
 
 

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="email_template_contact_inquiry" model="mail.template">
+            <field name="name">Website: Contact Inquiry</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="subject">Website Contact: {{ object.name }}</field>
+            <field name="email_from">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email') or 'info@pacificboeki.jp' }}</field>
+            <field name="email_to">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email_sales') or 'sales@pacificboeki.jp' }}</field>
+            <field name="reply_to">{{ object.email_from }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; padding: 15px;">
+                    <h3 style="color: #c8102e;">New Website Contact Inquiry</h3>
+                    <p><strong>Name:</strong> <t t-out="object.contact_name or object.name"/></p>
+                    <p><strong>Email:</strong> <t t-out="object.email_from"/></p>
+                    <p><strong>Phone:</strong> <t t-out="object.phone or 'N/A'"/></p>
+                    <p><strong>Country:</strong> <t t-out="object.country_id.name or 'N/A'"/></p>
+                    <p><strong>Message:</strong></p>
+                    <blockquote style="background: #f9f9f9; border-left: 3px solid #c8102e; padding: 10px; margin: 0;">
+                        <t t-out="object.description"/>
+                    </blockquote>
+                    <br/>
+                    <t t-call="auction.mail_footer_common"/>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="email_template_recruitment_hr_notification" model="mail.template">
+            <field name="name">Website: Recruitment HR Notification</field>
+            <field name="model_id" ref="pb_website.model_pb_recruitment_inquiry"/>
+            <field name="subject">新規求人応募: {{ object.name }} 様 ({{ object.recruitment_type.capitalize() if object.recruitment_type else '' }})</field>
+            <field name="email_from">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email') or 'info@pacificboeki.jp' }}</field>
+            <field name="email_to">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email_job') or 'careers@pacificboeki.jp' }}</field>
+            <field name="reply_to">{{ object.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; padding: 15px;">
+                    <h3 style="color: #c8102e;">新規求人応募を受信しました</h3>
+                    <p><strong>氏名:</strong> <t t-out="object.name"/></p>
+                    <p><strong>メールアドレス:</strong> <t t-out="object.email"/></p>
+                    <p><strong>電話番号:</strong> <t t-out="object.phone"/></p>
+                    <p><strong>生年月日:</strong> <t t-out="object.dob or '未入力'"/></p>
+                    <p><strong>住所:</strong> <t t-out="object.street_address or '未入力'"/></p>
+                    <p><strong>応募区分:</strong> <t t-out="object.recruitment_type"/></p>
+                    <p><strong>メッセージ:</strong></p>
+                    <blockquote style="background: #f9f9f9; border-left: 3px solid #c8102e; padding: 10px; margin: 0;">
+                        <t t-out="object.message"/>
+                    </blockquote>
+                    <br/>
+                    <t t-call="auction.mail_footer_common"/>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="email_template_recruitment_candidate_confirmation" model="mail.template">
+            <field name="name">Website: Recruitment Candidate Confirmation</field>
+            <field name="model_id" ref="pb_website.model_pb_recruitment_inquiry"/>
+            <field name="subject">求人応募を受け付けました</field>
+            <field name="email_from">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email') or 'info@pacificboeki.jp' }}</field>
+            <field name="email_to">{{ object.email }}</field>
+            <field name="reply_to">{{ object.env['ir.config_parameter'].sudo().get_param('pb_website.default_email_job') or 'careers@pacificboeki.jp' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; padding: 20px; line-height: 1.8; color: #333333;">
+                    <p style="font-size: 16px; font-weight: bold;"><t t-out="object.name"/> 様</p>
+                    <p>この度は、Pacific Boeki の求人にご応募いただき、誠にありがとうございます。</p>
+                    <p>ご応募内容および履歴書を正常に受け付けました。<br />
+                    採用担当者が内容を確認し、選考を進めさせていただきます。応募内容が募集条件に適している場合は、次の選考についてご連絡いたします。</p>
+                    <div style="background: #f9f9f9; border: 1px solid #eeeeee; padding: 16px; border-radius: 6px; margin: 20px 0;">
+                        <h4 style="margin-top: 0; color: #c8102e; border-bottom: 1px solid #ddd; padding-bottom: 8px;">応募内容</h4>
+                        <p style="margin: 6px 0;"><strong>氏名:</strong> <t t-out="object.name"/></p>
+                        <p style="margin: 6px 0;"><strong>メールアドレス:</strong> <t t-out="object.email"/></p>
+                        <p style="margin: 6px 0;"><strong>電話番号:</strong> <t t-out="object.phone"/></p>
+                        <p style="margin: 6px 0;"><strong>生年月日:</strong> <t t-out="object.dob or '未入力'"/></p>
+                        <p style="margin: 6px 0;"><strong>住所:</strong> <t t-out="object.street_address or '未入力'"/></p>
+                        <p style="margin: 6px 0;"><strong>応募区分:</strong> <t t-out="object.recruitment_type"/></p>
+                        <p style="margin: 6px 0;"><strong>メッセージ:</strong> <t t-out="object.message"/></p>
+                    </div>
+                    <p>この度は、Pacific Boeki にご関心をお寄せいただき、誠にありがとうございます。<br />
+                    今後ともどうぞよろしくお願いいたします。</p>
+                    <br/>
+                    <t t-call="auction.mail_footer_common"/>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+    </data>
+</odoo>

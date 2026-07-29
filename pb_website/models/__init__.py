@@ -13,3 +13,6 @@ from . import gallery
 from . import model_discount
 from . import shipping_schedule
 from . import shipping_schedule_import_wizard
+from . import stock_wishlist
+from . import recently_viewed
+

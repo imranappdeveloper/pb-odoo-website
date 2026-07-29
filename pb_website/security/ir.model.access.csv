@@ -20,3 +20,9 @@ access_shipping_schedule_user,shipping.schedule,model_shipping_schedule,base.gro
 access_shipping_schedule_line_public,shipping.schedule.line,model_shipping_schedule_line,base.group_portal,1,0,0,0
 access_shipping_schedule_line_user,shipping.schedule.line,model_shipping_schedule_line,base.group_user,1,1,1,1
 access_shipping_schedule_import_wizard_user,shipping.schedule.import.wizard,model_shipping_schedule_import_wizard,base.group_user,1,1,1,1
+access_pb_stock_wishlist_public,pb.stock.wishlist,model_pb_stock_wishlist,base.group_portal,1,1,1,1
+access_pb_stock_wishlist_user,pb.stock.wishlist,model_pb_stock_wishlist,base.group_user,1,1,1,1
+access_pb_recently_viewed_public,pb.recently.viewed,model_pb_recently_viewed,base.group_portal,1,1,1,1
+access_pb_recently_viewed_user,pb.recently.viewed,model_pb_recently_viewed,base.group_user,1,1,1,1
+
+

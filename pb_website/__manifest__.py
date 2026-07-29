@@ -9,9 +9,10 @@ This module defines custom Odoo models (news, testimonials, shipping rates/sched
 and JSON-RPC controllers to expose catalog data to the Next.js static website.
 """,
     'author': 'Antigravity / Pacific Boeki',
-    'depends': ['product', 'ls_product', 'ls_sale'],
+    'depends': ['product', 'ls_product', 'ls_sale', 'auction'],
     'data': [
         'security/ir.model.access.csv',
+        'data/mail_template_data.xml',
         'views/testimonial_views.xml',
         'views/news_views.xml',
         'views/team_member_views.xml',

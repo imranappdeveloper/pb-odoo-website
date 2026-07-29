@@ -2,3 +2,6 @@
 
 from . import main
 from . import shipping_controller
+from . import wishlist_controller
+from . import recently_viewed_controller
+

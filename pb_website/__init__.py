@@ -181,6 +181,20 @@ def post_init_hook(env):
     else:
         _logger.info("pb.job records already exist, skipping seeding")
 
+    # 6. Seed System Parameters
+    try:
+        config_param = env['ir.config_parameter'].sudo()
+        if not config_param.get_param('pb_website.default_email'):
+            config_param.set_param('pb_website.default_email', 'info@pacificboeki.jp')
+        if not config_param.get_param('pb_website.default_email_sales'):
+            config_param.set_param('pb_website.default_email_sales', 'sales@pacificboeki.jp')
+        if not config_param.get_param('pb_website.default_email_job'):
+            config_param.set_param('pb_website.default_email_job', 'careers@pacificboeki.jp')
+        _logger.info("Successfully checked/seeded pb_website email system parameters")
+    except Exception as e:
+        _logger.error("Failed to seed email system parameters: %s", str(e))
+
+
 
 
 
