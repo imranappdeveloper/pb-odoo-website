@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import json
+import logging
 from odoo import http
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 class ShippingScheduleController(http.Controller):
 
@@ -68,20 +71,29 @@ class ShippingScheduleController(http.Controller):
     @http.route('/api/v1/website/shipping-schedules', type='json', auth='public', methods=['POST', 'GET'], csrf=False)
     def get_shipping_schedules_json(self, origin_port=None, dest_port=None, carrier_name=None, trade_lane=None, **kw):
         """JSON-RPC API endpoint returning active shipping schedules."""
-        domain = [('active', '=', True)]
-        if carrier_name:
-            domain.append(('carrier_name', '=ilike', f'%{carrier_name}%'))
-        if trade_lane:
-            domain.append(('trade_lane', '=ilike', f'%{trade_lane}%'))
+        try:
+            domain = [('active', '=', True)]
+            if carrier_name:
+                domain.append(('carrier_name', '=ilike', f'%{carrier_name}%'))
+            if trade_lane:
+                domain.append(('trade_lane', '=ilike', f'%{trade_lane}%'))
 
-        schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
-        result = self._build_schedule_payload(schedules, origin_port=origin_port, dest_port=dest_port)
+            schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
+            result = self._build_schedule_payload(schedules, origin_port=origin_port, dest_port=dest_port)
 
-        return {
-            'status': 'success',
-            'count': len(result),
-            'schedules': result,
-        }
+            return {
+                'status': 'success',
+                'count': len(result),
+                'schedules': result,
+            }
+        except Exception as e:
+            _logger.exception("Error in get_shipping_schedules_json")
+            return {
+                'status': 'error',
+                'message': str(e),
+                'count': 0,
+                'schedules': [],
+            }
 
     # --------------------------------------------------------------------------
     # 2. REST HTTP GET Endpoint (Returns direct JSON for standard fetch/axios)
@@ -89,29 +101,43 @@ class ShippingScheduleController(http.Controller):
     @http.route('/api/v1/website/shipping-schedules/rest', type='http', auth='public', methods=['GET'], csrf=False)
     def get_shipping_schedules_rest(self, **kw):
         """REST HTTP GET endpoint for static website frontend integration."""
-        origin_port = kw.get('origin_port')
-        dest_port = kw.get('dest_port')
-        carrier_name = kw.get('carrier_name')
-        trade_lane = kw.get('trade_lane')
+        try:
+            origin_port = kw.get('origin_port')
+            dest_port = kw.get('dest_port')
+            carrier_name = kw.get('carrier_name')
+            trade_lane = kw.get('trade_lane')
 
-        domain = [('active', '=', True)]
-        if carrier_name:
-            domain.append(('carrier_name', '=ilike', f'%{carrier_name}%'))
-        if trade_lane:
-            domain.append(('trade_lane', '=ilike', f'%{trade_lane}%'))
+            domain = [('active', '=', True)]
+            if carrier_name:
+                domain.append(('carrier_name', '=ilike', f'%{carrier_name}%'))
+            if trade_lane:
+                domain.append(('trade_lane', '=ilike', f'%{trade_lane}%'))
 
-        schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
-        result = self._build_schedule_payload(schedules, origin_port=origin_port, dest_port=dest_port)
+            schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
+            result = self._build_schedule_payload(schedules, origin_port=origin_port, dest_port=dest_port)
 
-        response_data = {
-            'status': 'success',
-            'count': len(result),
-            'schedules': result,
-        }
-        return request.make_response(
-            json.dumps(response_data),
-            headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')]
-        )
+            response_data = {
+                'status': 'success',
+                'count': len(result),
+                'schedules': result,
+            }
+            return request.make_response(
+                json.dumps(response_data),
+                headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')]
+            )
+        except Exception as e:
+            _logger.exception("Error in get_shipping_schedules_rest")
+            error_payload = {
+                'status': 'error',
+                'message': str(e),
+                'count': 0,
+                'schedules': [],
+            }
+            return request.make_response(
+                json.dumps(error_payload),
+                headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')],
+                status=500
+            )
 
     # --------------------------------------------------------------------------
     # 3. Calendar & Region Grid Endpoint (Formatted for UI Calendar Cards/Tabs)
@@ -119,65 +145,82 @@ class ShippingScheduleController(http.Controller):
     @http.route('/api/v1/website/shipping-schedules/calendar', type='http', auth='public', methods=['GET'], csrf=False)
     def get_shipping_calendar_ui(self, **kw):
         """REST HTTP GET endpoint formatted specifically for UI Calendar / Region Tabs."""
-        selected_region = kw.get('region')
+        try:
+            selected_region = kw.get('region')
 
-        domain = [('active', '=', True)]
-        if selected_region and selected_region.lower() != 'all regions':
-            domain.append(('trade_lane', '=ilike', f'%{selected_region}%'))
+            domain = [('active', '=', True)]
+            if selected_region and selected_region.lower() != 'all regions':
+                domain.append(('trade_lane', '=ilike', f'%{selected_region}%'))
 
-        schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
-        
-        # Get all distinct region/trade lane names for tabs
-        all_active_schedules = request.env['shipping.schedule'].sudo().search([('active', '=', True)])
-        distinct_regions = list(set([s.trade_lane for s in all_active_schedules if s.trade_lane]))
-        distinct_regions.sort()
-        region_tabs = ['All Regions'] + distinct_regions
+            schedules = request.env['shipping.schedule'].sudo().search(domain, order='issue_date desc, id desc')
+            
+            # Get all distinct region/trade lane names for tabs
+            all_active_schedules = request.env['shipping.schedule'].sudo().search([('active', '=', True)])
+            distinct_regions = list(set([s.trade_lane for s in all_active_schedules if s.trade_lane]))
+            distinct_regions.sort()
+            region_tabs = ['All Regions'] + distinct_regions
 
-        calendar_grid = []
-        for sched in schedules:
-            pol_list = []
-            pod_list = []
+            calendar_grid = []
+            for sched in schedules:
+                pol_list = []
+                pod_list = []
 
-            for line in sched.line_ids:
-                item = {
-                    'id': line.id,
-                    'port_name': line.port_name,
-                    'port_code': line.port_code,
-                    'eta': line.eta.isoformat() if line.eta else None,
-                    'etd': line.etd.isoformat() if line.etd else None,
-                    'eta_end': line.eta_end.isoformat() if line.eta_end else None,
-                    'etd_end': line.etd_end.isoformat() if line.etd_end else None,
-                    'status': line.status,
-                    'remarks': line.remarks,
-                }
-                if line.call_type == 'pol':
-                    pol_list.append(item)
-                else:
-                    pod_list.append(item)
+                for line in sched.line_ids:
+                    item = {
+                        'id': line.id,
+                        'port_name': line.port_name,
+                        'port_code': line.port_code,
+                        'eta': line.eta.isoformat() if line.eta else None,
+                        'etd': line.etd.isoformat() if line.etd else None,
+                        'eta_end': line.eta_end.isoformat() if line.eta_end else None,
+                        'etd_end': line.etd_end.isoformat() if line.etd_end else None,
+                        'status': line.status,
+                        'remarks': line.remarks,
+                    }
+                    if line.call_type == 'pol':
+                        pol_list.append(item)
+                    else:
+                        pod_list.append(item)
 
-            calendar_grid.append({
-                'schedule_id': sched.id,
-                'title': sched.name,
-                'carrier': sched.carrier_name,
-                'vessel': sched.vessel_name,
-                'voyage': sched.voyage_no,
-                'trade_lane': sched.trade_lane,
-                'revision': sched.revision_no,
-                'issue_date': sched.issue_date.isoformat() if sched.issue_date else None,
-                'cargo_restrictions': sched.cargo_restrictions,
-                'loading_ports (POL)': pol_list,
-                'discharge_ports (POD)': pod_list,
-            })
+                calendar_grid.append({
+                    'schedule_id': sched.id,
+                    'title': sched.name,
+                    'carrier': sched.carrier_name,
+                    'vessel': sched.vessel_name,
+                    'voyage': sched.voyage_no,
+                    'trade_lane': sched.trade_lane,
+                    'revision': sched.revision_no,
+                    'issue_date': sched.issue_date.isoformat() if sched.issue_date else None,
+                    'cargo_restrictions': sched.cargo_restrictions,
+                    'loading_ports (POL)': pol_list,
+                    'discharge_ports (POD)': pod_list,
+                })
 
-        response_payload = {
-            'status': 'success',
-            'available_region_tabs': region_tabs,
-            'selected_region': selected_region or 'All Regions',
-            'count': len(calendar_grid),
-            'schedules': calendar_grid,
-        }
+            response_payload = {
+                'status': 'success',
+                'available_region_tabs': region_tabs,
+                'selected_region': selected_region or 'All Regions',
+                'count': len(calendar_grid),
+                'schedules': calendar_grid,
+            }
 
-        return request.make_response(
-            json.dumps(response_payload),
-            headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')]
-        )
+            return request.make_response(
+                json.dumps(response_payload),
+                headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')]
+            )
+        except Exception as e:
+            _logger.exception("Error in get_shipping_calendar_ui")
+            error_payload = {
+                'status': 'error',
+                'message': str(e),
+                'available_region_tabs': ['All Regions'],
+                'selected_region': kw.get('region') or 'All Regions',
+                'count': 0,
+                'schedules': [],
+            }
+            return request.make_response(
+                json.dumps(error_payload),
+                headers=[('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')],
+                status=500
+            )
+
