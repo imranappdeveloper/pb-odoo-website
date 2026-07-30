@@ -8,7 +8,7 @@ class PbBanner(models.Model):
     _order = 'sequence, id'
 
     name = fields.Char(string='Name', required=True)
-    image = fields.Binary(string="Image", required=True)
+    image = fields.Image(string="Image", required=True)
     sequence = fields.Integer(string='Sequence', default=10)
     is_active = fields.Boolean(string='Active', default=True)
     title = fields.Char(string='Title')

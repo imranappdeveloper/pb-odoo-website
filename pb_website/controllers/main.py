@@ -205,12 +205,18 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_testimonials")
             return self._make_error_response(_("An unexpected error occurred while fetching testimonials."), status=500)
 
-    @http.route(['/api/v1/website/banner/image/<int:banner_id>', '/web/image/pb.banner/<int:banner_id>/image'], type='http', auth='public', methods=['GET'], csrf=False, cors='*')
+    @http.route('/api/v1/website/banner/image/<int:banner_id>', type='http', auth='public', methods=['GET'], csrf=False, cors='*')
     def get_banner_image(self, banner_id, **kwargs):
         try:
             banner = request.env['pb.banner'].sudo().browse(banner_id)
             if banner.exists() and banner.image:
-                image_data = base64.b64decode(banner.image)
+                raw_data = banner.image
+                if isinstance(raw_data, str):
+                    raw_data = raw_data.encode('utf-8')
+                try:
+                    image_data = base64.b64decode(raw_data)
+                except Exception:
+                    image_data = raw_data
                 return request.make_response(image_data, [
                     ('Content-Type', 'image/jpeg'),
                     ('Cache-Control', 'public, max-age=86400')
@@ -219,12 +225,18 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Error serving banner image")
         return request.not_found()
 
-    @http.route(['/api/v1/website/news/image/<int:news_id>', '/web/image/pb.news/<int:news_id>/thumbnail'], type='http', auth='public', methods=['GET'], csrf=False, cors='*')
+    @http.route('/api/v1/website/news/image/<int:news_id>', type='http', auth='public', methods=['GET'], csrf=False, cors='*')
     def get_news_image(self, news_id, **kwargs):
         try:
             news = request.env['pb.news'].sudo().browse(news_id)
             if news.exists() and news.thumbnail:
-                image_data = base64.b64decode(news.thumbnail)
+                raw_data = news.thumbnail
+                if isinstance(raw_data, str):
+                    raw_data = raw_data.encode('utf-8')
+                try:
+                    image_data = base64.b64decode(raw_data)
+                except Exception:
+                    image_data = raw_data
                 return request.make_response(image_data, [
                     ('Content-Type', 'image/jpeg'),
                     ('Cache-Control', 'public, max-age=86400')
@@ -242,10 +254,11 @@ class WebsiteCatalogController(http.Controller):
             records = request.env['pb.banner'].sudo().search([('is_active', '=', True)], order='sequence, id')
             banners = []
             for record in records:
+                img_str = record.image.decode('utf-8') if isinstance(record.image, bytes) else (record.image or "")
                 banners.append({
                     "id": record.id,
                     "name": record.name,
-                    "imageUrl": f"data:image/jpeg;base64,{record.image.decode('utf-8')}" if record.image else "",
+                    "imageUrl": f"data:image/jpeg;base64,{img_str}" if img_str else "",
                     "sequence": record.sequence,
                     "isActive": record.is_active,
                     "title": record.title or "",
