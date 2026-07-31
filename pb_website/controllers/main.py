@@ -728,106 +728,6 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_vehicles")
             return self._make_error_response(_("An unexpected error occurred while fetching vehicles."), status=500)
 
-    @http.route('/api/v1/website/vehicles/detail', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
-    def get_vehicle_detail(self, **kwargs):
-        """
-        API Endpoint: Returns detailed specifications for a single vehicle template by ID.
-        """
-        try:
-            vehicle_id = int(kwargs.get('vehicle_id') or kwargs.get('id') or 0)
-            if not vehicle_id:
-                return self._make_error_response(_("Vehicle ID is required."), status=400)
-
-            record = request.env['product.template'].sudo().browse(vehicle_id)
-            if not record.exists():
-                return self._make_error_response(_("Vehicle not found."), status=404)
-
-            image_urls = []
-            if record.image_1920:
-                image_urls.append(f"/web/image/product.template/{record.id}/image_1920")
-
-            if hasattr(record, 'product_template_image_ids') and record.product_template_image_ids:
-                for img in record.product_template_image_ids:
-                    image_urls.append(f"/web/image/product.image/{img.id}/image_1920")
-
-            if not image_urls:
-                image_urls.append(get_dummy_vehicle_image(record.id))
-
-            # Extract model code
-            model_code = getattr(record, 'model_code', getattr(record, 'x_model_code', ''))
-            if hasattr(model_code, 'name'):
-                model_code = model_code.name
-            if not model_code:
-                model_code = record.name.split('-')[0] if record.name and '-' in record.name else 'DBA-XYZ'
-
-            # Extract chassis number and mask it
-            chassis_no = record.name or ""
-            chassis_no_masked = chassis_no
-            if len(chassis_no) > 4:
-                chassis_no_masked = chassis_no[:-4] + "****"
-
-            # Parse accessories checklist
-            accessories = []
-            opt_fields = {
-                'x_opt_ac': 'Air Conditioning',
-                'x_opt_ps': 'Power Steering',
-                'x_opt_pw': 'Power Windows',
-                'x_opt_airbag': 'Air Bags',
-                'x_opt_abs': 'ABS Brakes',
-                'x_opt_nav': 'Navigation',
-                'x_opt_sunroof': 'Sunroof',
-                'x_opt_leather': 'Leather Seats',
-                'x_opt_alloy': 'Alloy Wheels',
-                'opt_ac': 'Air Conditioning',
-                'opt_ps': 'Power Steering',
-                'opt_pw': 'Power Windows',
-                'opt_airbag': 'Air Bags',
-                'opt_abs': 'ABS Brakes',
-                'opt_nav': 'Navigation',
-                'opt_sunroof': 'Sunroof',
-                'opt_leather': 'Leather Seats',
-                'opt_alloy': 'Alloy Wheels',
-            }
-            for field, label in opt_fields.items():
-                if hasattr(record, field) and getattr(record, field):
-                    if label not in accessories:
-                        accessories.append(label)
-
-            vehicle = {
-                "id": record.id,
-                "name": record.name or "",
-                "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
-                "maker": record.maker.name if hasattr(record, 'maker') and record.maker else "",
-                "model": record.car_name.name if hasattr(record, 'car_name') and record.car_name else "",
-                "stockId": record.stock_id or "",
-                "year": record.year or 0,
-                "km": f"{record.km or ''} km" if record.km else "0 km",
-                "engineCc": f"{record.engine_cc.name or ''} cc" if hasattr(record, 'engine_cc') and record.engine_cc else "",
-                "transmission": record.transmission.name if hasattr(record, 'transmission') and record.transmission else "",
-                "fuelType": record.fuel_type.name if hasattr(record, 'fuel_type') and record.fuel_type else "",
-                "carCategory": record.car_category.name if hasattr(record, 'car_category') and record.car_category else "",
-                "driveType": record.drive_type or "right_hand",
-                "doors": record.doors or "5",
-                "seatingCapacity": record.seating_capacity or 5,
-                "exteriorColor": record.exterior_color.name if hasattr(record, 'exterior_color') and record.exterior_color else "",
-                "grade": record.grade or "4.5",
-                "fobPriceUsd": record.fob_price or 0,
-                "fobPriceJpy": record.final_fob_price or 0,
-                "priceCurrency": "JPY",
-                "stockLocation": record.stock_location.name if hasattr(record, 'stock_location') and record.stock_location else "Yokohama, Japan",
-                "imageUrls": image_urls,
-                "isFeatured": record.is_featured or False,
-                "isKenyaStock": record.is_kenya_stock or False,
-                "isDiscounted": record.is_discounted or False,
-                "modelCode": model_code,
-                "chassisNoMasked": chassis_no_masked,
-                "accessories": accessories,
-            }
-            return self._make_json_response(vehicle)
-        except Exception as e:
-            _logger.exception("Unexpected error in get_vehicle_detail")
-            return self._make_error_response(_("An unexpected error occurred while fetching vehicle detail."), status=500)
-
     @http.route('/api/v1/website/shipping/rates', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_shipping_rates(self, **kwargs):
         """
@@ -1524,8 +1424,6 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
-
-
 
 
 
