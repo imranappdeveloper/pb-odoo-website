@@ -5,6 +5,12 @@ from odoo.http import request
 import json
 import logging
 
+from .public_write_protection import (
+    PublicWriteError,
+    enforce_public_write,
+    resolve_contact_email_policy,
+)
+
 _logger = logging.getLogger(__name__)
 
 def get_dummy_vehicle_image(record_id):
@@ -54,11 +60,28 @@ class WebsiteCatalogController(http.Controller):
         json_str = json.dumps(response_data, cls=OdooJsonEncoder)
         return json.loads(json_str)
 
-    def _make_error_response(self, message, status=400):
+    def _make_error_response(self, message, status=400, code=None, retry_after_seconds=None):
         """
         Standardized Error response wrapper.
+        Optional typed ``code`` for public-write abuse controls.
         """
-        return self._make_json_response({'message': message}, status=status)
+        payload = {'message': message}
+        if code:
+            payload['code'] = code
+        if retry_after_seconds is not None:
+            payload['retry_after_seconds'] = retry_after_seconds
+        return self._make_json_response(payload, status=status)
+
+    def _public_write_error_response(self, err):
+        """Map PublicWriteError to the standard API error envelope."""
+        if isinstance(err, PublicWriteError):
+            return self._make_error_response(
+                err.message,
+                status=err.http_status,
+                code=err.code,
+                retry_after_seconds=err.retry_after_seconds,
+            )
+        return self._make_error_response(str(err), status=400)
 
     def _get_email_params(self):
         """
@@ -951,8 +974,23 @@ class WebsiteCatalogController(http.Controller):
     def contact(self, **kwargs):
         """
         API Endpoint: Creates a new lead in CRM (crm.lead) from contact form submission.
+
+        Protected by the shared public-write boundary: reCAPTCHA verification and
+        rate limiting run before any CRM or email side effect. Email template and
+        internal recipient come from server policy only.
         """
         try:
+            # Abuse controls first — no CRM/email side effects on failure
+            try:
+                enforce_public_write(kwargs, expected_action='contact')
+            except PublicWriteError as pwe:
+                _logger.info(
+                    "contact public-write blocked code=%s ip=%s",
+                    pwe.code,
+                    (request.httprequest.remote_addr if request.httprequest else 'n/a'),
+                )
+                return self._public_write_error_response(pwe)
+
             tlt = kwargs.get('tlt')
             name = kwargs.get('name')
             country_name = kwargs.get('country')
@@ -964,7 +1002,11 @@ class WebsiteCatalogController(http.Controller):
             msg = kwargs.get('msg')
 
             if not name or not email or not msg:
-                return self._make_error_response(_("Name, Email, and Message are required fields."), status=400)
+                return self._make_error_response(
+                    _("Name, Email, and Message are required fields."),
+                    status=400,
+                    code='VALIDATION_ERROR',
+                )
 
             # Resolve Country ID
             country_id = False
@@ -992,10 +1034,10 @@ class WebsiteCatalogController(http.Controller):
             }
             lead = request.env['crm.lead'].sudo().create(lead_vals)
 
-            # Get configured sales email and sender email
-            email_params = self._get_email_params()
-            sales_email = email_params['default_email_sales']
-            from_email = email_params['default_email']
+            # Server policy only — ignore any client template/recipient overrides
+            email_policy = resolve_contact_email_policy()
+            sales_email = email_policy['email_to']
+            from_email = email_policy['email_from']
 
             # Create mail.mail email record for contact inquiry
             try:
@@ -1106,11 +1148,21 @@ class WebsiteCatalogController(http.Controller):
                 {self._get_common_mail_footer(default_email)}
                 """
 
-            # Determine email recipient based on template context
+            # Determine email recipient based on template context.
+            # Server policy: contact_us always uses internal sales recipient — client cannot override.
             is_customer_facing = template_code in ['welcome_member'] or data.get('is_applicant_confirmation')
             is_job_template = 'job' in template_code or 'recruitment' in template_code
+            is_contact_template = template_code in ('contact_us', 'contact')
 
-            if recipient_email:
+            if is_contact_template:
+                email_policy = resolve_contact_email_policy()
+                email_to = email_policy['email_to']
+                if recipient_email and recipient_email.strip().lower() != (email_to or '').strip().lower():
+                    _logger.info(
+                        "email/send ignored client recipient for contact_us (policy=%s)",
+                        email_to,
+                    )
+            elif recipient_email:
                 email_to = recipient_email
             elif is_customer_facing:
                 email_to = data.get('email') or default_email
