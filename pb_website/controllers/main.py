@@ -892,11 +892,29 @@ class WebsiteCatalogController(http.Controller):
 
     @http.route('/api/v1/website/inquiry', type='json', auth='public', methods=['POST'], csrf=False)
     def submit_vehicle_inquiry(self, **kwargs):
+        return self._submit_vehicle_write(kwargs, expected_action='vehicle_inquiry')
+
+    @http.route('/api/v1/website/quote', type='json', auth='public', methods=['POST'], csrf=False)
+    def submit_vehicle_quote(self, **kwargs):
+        return self._submit_vehicle_write(kwargs, expected_action='quote')
+
+    def _submit_vehicle_write(self, kwargs, expected_action):
         """
-        Record a vehicle inquiry and bind a 24-hour reveal entitlement to the
-        current Odoo session. Client-provided user/partner/auth flags are ignored.
+        Record an inquiry/quote and bind a 24-hour reveal entitlement to the
+        current Odoo session. The route supplies the expected write action.
         """
         try:
+            # Abuse controls must run before vehicle lookup, CRM lead creation,
+            # entitlement grant, or any notification side effect.
+            try:
+                enforce_public_write(kwargs, expected_action=expected_action)
+            except PublicWriteError as pwe:
+                _logger.info(
+                    "vehicle inquiry public-write blocked code=%s",
+                    pwe.code,
+                )
+                return self._public_write_error_response(pwe)
+
             name = str(kwargs.get('name') or '').strip()
             email = str(kwargs.get('email') or '').strip()
             message = str(kwargs.get('message') or '').strip()
@@ -1104,9 +1122,8 @@ class WebsiteCatalogController(http.Controller):
                 enforce_public_write(kwargs, expected_action='contact')
             except PublicWriteError as pwe:
                 _logger.info(
-                    "contact public-write blocked code=%s ip=%s",
+                    "contact public-write blocked code=%s",
                     pwe.code,
-                    (request.httprequest.remote_addr if request.httprequest else 'n/a'),
                 )
                 return self._public_write_error_response(pwe)
 
@@ -1643,5 +1660,3 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
-
-
