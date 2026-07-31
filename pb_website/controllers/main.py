@@ -5,6 +5,8 @@ from odoo.http import request
 import json
 import logging
 
+from .chassis_security import mask_chassis, protect_serialized_vehicle
+
 _logger = logging.getLogger(__name__)
 
 def get_dummy_vehicle_image(record_id):
@@ -28,6 +30,58 @@ class WebsiteCatalogController(http.Controller):
     Controller for Pacific Boeki Website API Integration.
     Exposes endpoints for stock search, filters, testimonials, news, shipping schedules, and forms.
     """
+
+    def _session_id(self):
+        """Return only Odoo's server-issued session identifier."""
+        return getattr(request.session, 'sid', '') or ''
+
+    def _can_reveal_chassis(self, vehicle):
+        """Authorize from server session state; client identity fields are ignored."""
+        if request.session.uid:
+            return True
+        vehicle_model = getattr(vehicle, '_name', 'product.template')
+        vehicle_ref = str(getattr(vehicle, 'id', '') or '')
+        return request.env['pb.chassis.reveal.entitlement'].sudo().has_active(
+            self._session_id(),
+            vehicle_model,
+            vehicle_ref,
+        )
+
+    def _find_vehicle(self, reference):
+        reference = str(reference or '').strip()
+        if not reference:
+            return request.env['product.template'].browse()
+        if reference.isdigit():
+            vehicle = request.env['product.template'].sudo().browse(int(reference))
+            if vehicle.exists():
+                return vehicle
+        return request.env['product.template'].sudo().search([
+            '|', '|',
+            ('stock_id', '=', reference),
+            ('name', '=', reference),
+            ('barcode', '=', reference),
+        ], limit=1)
+
+    def _find_inquiry_vehicle(self, reference):
+        normalized = str(reference or '').strip().replace('PB-', '', 1)
+        if normalized.startswith('Q') and normalized[1:].isdigit():
+            quick_car = request.env['quick.car'].sudo().browse(
+                int(normalized[1:])
+            )
+            if quick_car.exists():
+                return quick_car, 'quick.car', str(quick_car.id)
+        product_reference = normalized[1:] if normalized.startswith('P') else normalized
+        product = self._find_vehicle(product_reference)
+        if product:
+            return product, 'product.template', str(product.id)
+        quick_car = request.env['quick.car'].sudo().search([
+            '|',
+            ('vehicle_id', '=', normalized),
+            ('chassis_number', '=', normalized),
+        ], limit=1)
+        if quick_car:
+            return quick_car, 'quick.car', str(quick_car.id)
+        return request.env['product.template'].browse(), '', ''
 
     def _make_json_response(self, data, status=200, meta=None):
         """
@@ -515,7 +569,7 @@ class WebsiteCatalogController(http.Controller):
                 if not image_urls:
                     image_urls.append(get_dummy_vehicle_image(record.id))
 
-                vehicles.append({
+                vehicle = {
                     "id": record.id,
                     "name": record.name or "",
                     "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
@@ -541,7 +595,12 @@ class WebsiteCatalogController(http.Controller):
                     "isFeatured": record.is_featured or False,
                     "isKenyaStock": record.is_kenya_stock or False,
                     "isDiscounted": record.is_discounted or False
-                })
+                }
+                vehicles.append(protect_serialized_vehicle(
+                    vehicle,
+                    record.name or '',
+                    authorized=self._can_reveal_chassis(record),
+                ))
             return self._make_json_response(vehicles)
         except Exception as e:
             _logger.exception("Unexpected error in get_new_arrivals")
@@ -656,7 +715,7 @@ class WebsiteCatalogController(http.Controller):
                 if not image_urls:
                     image_urls.append(get_dummy_vehicle_image(record.id))
 
-                vehicles.append({
+                vehicle = {
                     "id": record.id,
                     "name": record.name or "",
                     "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
@@ -682,7 +741,12 @@ class WebsiteCatalogController(http.Controller):
                     "isFeatured": record.is_featured or False,
                     "isKenyaStock": record.is_kenya_stock or False,
                     "isDiscounted": record.is_discounted or False
-                })
+                }
+                vehicles.append(protect_serialized_vehicle(
+                    vehicle,
+                    record.name or '',
+                    authorized=self._can_reveal_chassis(record),
+                ))
 
             return self._make_json_response({
                 "vehicles": vehicles,
@@ -698,12 +762,17 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Returns detailed specifications for a single vehicle template by ID.
         """
         try:
-            vehicle_id = int(kwargs.get('vehicle_id') or kwargs.get('id') or 0)
-            if not vehicle_id:
+            reference = (
+                kwargs.get('vehicle_id')
+                or kwargs.get('id')
+                or kwargs.get('vehicleRef')
+                or kwargs.get('stock_id')
+            )
+            if not reference:
                 return self._make_error_response(_("Vehicle ID is required."), status=400)
 
-            record = request.env['product.template'].sudo().browse(vehicle_id)
-            if not record.exists():
+            record = self._find_vehicle(reference)
+            if not record:
                 return self._make_error_response(_("Vehicle not found."), status=404)
 
             image_urls = []
@@ -726,9 +795,7 @@ class WebsiteCatalogController(http.Controller):
 
             # Extract chassis number and mask it
             chassis_no = record.name or ""
-            chassis_no_masked = chassis_no
-            if len(chassis_no) > 4:
-                chassis_no_masked = chassis_no[:-4] + "****"
+            chassis_no_masked = mask_chassis(chassis_no)
 
             # Parse accessories checklist
             accessories = []
@@ -787,10 +854,76 @@ class WebsiteCatalogController(http.Controller):
                 "chassisNoMasked": chassis_no_masked,
                 "accessories": accessories,
             }
-            return self._make_json_response(vehicle)
+            authorized = self._can_reveal_chassis(record)
+            protected_vehicle = protect_serialized_vehicle(
+                vehicle,
+                chassis_no,
+                authorized=authorized,
+            )
+            protected_vehicle['chassisNoMasked'] = (
+                chassis_no if authorized else chassis_no_masked
+            )
+            return self._make_json_response(protected_vehicle)
         except Exception as e:
             _logger.exception("Unexpected error in get_vehicle_detail")
             return self._make_error_response(_("An unexpected error occurred while fetching vehicle detail."), status=500)
+
+    @http.route('/api/v1/website/inquiry', type='json', auth='public', methods=['POST'], csrf=False)
+    def submit_vehicle_inquiry(self, **kwargs):
+        """
+        Record a vehicle inquiry and bind a 24-hour reveal entitlement to the
+        current Odoo session. Client-provided user/partner/auth flags are ignored.
+        """
+        try:
+            name = str(kwargs.get('name') or '').strip()
+            email = str(kwargs.get('email') or '').strip()
+            message = str(kwargs.get('message') or '').strip()
+            vehicle_ref = str(kwargs.get('vehicleRef') or '').strip()
+            if not name or not email or not message or not vehicle_ref:
+                return self._make_error_response(
+                    _("Name, email, message, and vehicle reference are required."),
+                    status=400,
+                )
+
+            vehicle, vehicle_model, entitlement_ref = self._find_inquiry_vehicle(
+                vehicle_ref
+            )
+            if not vehicle:
+                return self._make_error_response(_("Vehicle not found."), status=404)
+
+            inquiry = request.env['crm.lead'].sudo().create({
+                'name': _("Vehicle inquiry: %s") % vehicle_ref,
+                'contact_name': name,
+                'email_from': email,
+                'phone': str(kwargs.get('phone') or '').strip(),
+                'description': message,
+                'type': 'lead',
+            })
+            entitlement = request.env[
+                'pb.chassis.reveal.entitlement'
+            ].sudo().grant(
+                self._session_id(),
+                vehicle_model,
+                entitlement_ref,
+                inquiry,
+            )
+            if not entitlement:
+                return self._make_error_response(
+                    _("Unable to authorize this inquiry session."),
+                    status=500,
+                )
+            return self._make_json_response({
+                'success': True,
+                'lead_id': inquiry.id,
+                'vehicle_id': vehicle.id,
+                'expires_at': entitlement.expires_at,
+            })
+        except Exception:
+            _logger.exception("Unexpected error in submit_vehicle_inquiry")
+            return self._make_error_response(
+                _("An unexpected error occurred while submitting the inquiry."),
+                status=500,
+            )
 
     @http.route('/api/v1/website/shipping/rates', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_shipping_rates(self, **kwargs):
@@ -1459,10 +1592,6 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
-
-
-
-
 
 
 
