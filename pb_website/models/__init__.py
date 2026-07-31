@@ -15,4 +15,4 @@ from . import shipping_schedule
 from . import shipping_schedule_import_wizard
 from . import stock_wishlist
 from . import recently_viewed
-
+from . import chassis_reveal_entitlement
