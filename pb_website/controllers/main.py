@@ -5,6 +5,13 @@ from odoo.http import request
 import json
 import logging
 
+from .chassis_security import mask_chassis, protect_serialized_vehicle
+from .public_write_protection import (
+    PublicWriteError,
+    enforce_public_write,
+    resolve_contact_email_policy,
+)
+
 _logger = logging.getLogger(__name__)
 
 def get_dummy_vehicle_image(record_id):
@@ -28,6 +35,58 @@ class WebsiteCatalogController(http.Controller):
     Controller for Pacific Boeki Website API Integration.
     Exposes endpoints for stock search, filters, testimonials, news, shipping schedules, and forms.
     """
+
+    def _session_id(self):
+        """Return only Odoo's server-issued session identifier."""
+        return getattr(request.session, 'sid', '') or ''
+
+    def _can_reveal_chassis(self, vehicle):
+        """Authorize from server session state; client identity fields are ignored."""
+        if request.session.uid:
+            return True
+        vehicle_model = getattr(vehicle, '_name', 'product.template')
+        vehicle_ref = str(getattr(vehicle, 'id', '') or '')
+        return request.env['pb.chassis.reveal.entitlement'].sudo().has_active(
+            self._session_id(),
+            vehicle_model,
+            vehicle_ref,
+        )
+
+    def _find_vehicle(self, reference):
+        reference = str(reference or '').strip()
+        if not reference:
+            return request.env['product.template'].browse()
+        if reference.isdigit():
+            vehicle = request.env['product.template'].sudo().browse(int(reference))
+            if vehicle.exists():
+                return vehicle
+        return request.env['product.template'].sudo().search([
+            '|', '|',
+            ('stock_id', '=', reference),
+            ('name', '=', reference),
+            ('barcode', '=', reference),
+        ], limit=1)
+
+    def _find_inquiry_vehicle(self, reference):
+        normalized = str(reference or '').strip().replace('PB-', '', 1)
+        if normalized.startswith('Q') and normalized[1:].isdigit():
+            quick_car = request.env['quick.car'].sudo().browse(
+                int(normalized[1:])
+            )
+            if quick_car.exists():
+                return quick_car, 'quick.car', str(quick_car.id)
+        product_reference = normalized[1:] if normalized.startswith('P') else normalized
+        product = self._find_vehicle(product_reference)
+        if product:
+            return product, 'product.template', str(product.id)
+        quick_car = request.env['quick.car'].sudo().search([
+            '|',
+            ('vehicle_id', '=', normalized),
+            ('chassis_number', '=', normalized),
+        ], limit=1)
+        if quick_car:
+            return quick_car, 'quick.car', str(quick_car.id)
+        return request.env['product.template'].browse(), '', ''
 
     def _make_json_response(self, data, status=200, meta=None):
         """
@@ -54,11 +113,28 @@ class WebsiteCatalogController(http.Controller):
         json_str = json.dumps(response_data, cls=OdooJsonEncoder)
         return json.loads(json_str)
 
-    def _make_error_response(self, message, status=400):
+    def _make_error_response(self, message, status=400, code=None, retry_after_seconds=None):
         """
         Standardized Error response wrapper.
+        Optional typed ``code`` for public-write abuse controls.
         """
-        return self._make_json_response({'message': message}, status=status)
+        payload = {'message': message}
+        if code:
+            payload['code'] = code
+        if retry_after_seconds is not None:
+            payload['retry_after_seconds'] = retry_after_seconds
+        return self._make_json_response(payload, status=status)
+
+    def _public_write_error_response(self, err):
+        """Map PublicWriteError to the standard API error envelope."""
+        if isinstance(err, PublicWriteError):
+            return self._make_error_response(
+                err.message,
+                status=err.http_status,
+                code=err.code,
+                retry_after_seconds=err.retry_after_seconds,
+            )
+        return self._make_error_response(str(err), status=400)
 
     def _get_email_params(self):
         """
@@ -528,7 +604,7 @@ class WebsiteCatalogController(http.Controller):
                 if not image_urls:
                     image_urls.append(get_dummy_vehicle_image(record.id))
 
-                vehicles.append({
+                vehicle = {
                     "id": record.id,
                     "name": record.name or "",
                     "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
@@ -554,7 +630,12 @@ class WebsiteCatalogController(http.Controller):
                     "isFeatured": record.is_featured or False,
                     "isKenyaStock": record.is_kenya_stock or False,
                     "isDiscounted": record.is_discounted or False
-                })
+                }
+                vehicles.append(protect_serialized_vehicle(
+                    vehicle,
+                    record.name or '',
+                    authorized=self._can_reveal_chassis(record),
+                ))
             return self._make_json_response(vehicles)
         except Exception as e:
             _logger.exception("Unexpected error in get_new_arrivals")
@@ -669,7 +750,7 @@ class WebsiteCatalogController(http.Controller):
                 if not image_urls:
                     image_urls.append(get_dummy_vehicle_image(record.id))
 
-                vehicles.append({
+                vehicle = {
                     "id": record.id,
                     "name": record.name or "",
                     "title": f"{record.car_name.name or ''} {record.name or ''}".strip(),
@@ -695,7 +776,12 @@ class WebsiteCatalogController(http.Controller):
                     "isFeatured": record.is_featured or False,
                     "isKenyaStock": record.is_kenya_stock or False,
                     "isDiscounted": record.is_discounted or False
-                })
+                }
+                vehicles.append(protect_serialized_vehicle(
+                    vehicle,
+                    record.name or '',
+                    authorized=self._can_reveal_chassis(record),
+                ))
 
             return self._make_json_response({
                 "vehicles": vehicles,
@@ -711,12 +797,17 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Returns detailed specifications for a single vehicle template by ID.
         """
         try:
-            vehicle_id = int(kwargs.get('vehicle_id') or kwargs.get('id') or 0)
-            if not vehicle_id:
+            reference = (
+                kwargs.get('vehicle_id')
+                or kwargs.get('id')
+                or kwargs.get('vehicleRef')
+                or kwargs.get('stock_id')
+            )
+            if not reference:
                 return self._make_error_response(_("Vehicle ID is required."), status=400)
 
-            record = request.env['product.template'].sudo().browse(vehicle_id)
-            if not record.exists():
+            record = self._find_vehicle(reference)
+            if not record:
                 return self._make_error_response(_("Vehicle not found."), status=404)
 
             image_urls = []
@@ -739,9 +830,7 @@ class WebsiteCatalogController(http.Controller):
 
             # Extract chassis number and mask it
             chassis_no = record.name or ""
-            chassis_no_masked = chassis_no
-            if len(chassis_no) > 4:
-                chassis_no_masked = chassis_no[:-4] + "****"
+            chassis_no_masked = mask_chassis(chassis_no)
 
             # Parse accessories checklist
             accessories = []
@@ -800,10 +889,94 @@ class WebsiteCatalogController(http.Controller):
                 "chassisNoMasked": chassis_no_masked,
                 "accessories": accessories,
             }
-            return self._make_json_response(vehicle)
+            authorized = self._can_reveal_chassis(record)
+            protected_vehicle = protect_serialized_vehicle(
+                vehicle,
+                chassis_no,
+                authorized=authorized,
+            )
+            protected_vehicle['chassisNoMasked'] = (
+                chassis_no if authorized else chassis_no_masked
+            )
+            return self._make_json_response(protected_vehicle)
         except Exception as e:
             _logger.exception("Unexpected error in get_vehicle_detail")
             return self._make_error_response(_("An unexpected error occurred while fetching vehicle detail."), status=500)
+
+    @http.route('/api/v1/website/inquiry', type='json', auth='public', methods=['POST'], csrf=False)
+    def submit_vehicle_inquiry(self, **kwargs):
+        return self._submit_vehicle_write(kwargs, expected_action='vehicle_inquiry')
+
+    @http.route('/api/v1/website/quote', type='json', auth='public', methods=['POST'], csrf=False)
+    def submit_vehicle_quote(self, **kwargs):
+        return self._submit_vehicle_write(kwargs, expected_action='quote')
+
+    def _submit_vehicle_write(self, kwargs, expected_action):
+        """
+        Record an inquiry/quote and bind a 24-hour reveal entitlement to the
+        current Odoo session. The route supplies the expected write action.
+        """
+        try:
+            # Abuse controls must run before vehicle lookup, CRM lead creation,
+            # entitlement grant, or any notification side effect.
+            try:
+                enforce_public_write(kwargs, expected_action=expected_action)
+            except PublicWriteError as pwe:
+                _logger.info(
+                    "vehicle inquiry public-write blocked code=%s",
+                    pwe.code,
+                )
+                return self._public_write_error_response(pwe)
+
+            name = str(kwargs.get('name') or '').strip()
+            email = str(kwargs.get('email') or '').strip()
+            message = str(kwargs.get('message') or '').strip()
+            vehicle_ref = str(kwargs.get('vehicleRef') or '').strip()
+            if not name or not email or not message or not vehicle_ref:
+                return self._make_error_response(
+                    _("Name, email, message, and vehicle reference are required."),
+                    status=400,
+                )
+
+            vehicle, vehicle_model, entitlement_ref = self._find_inquiry_vehicle(
+                vehicle_ref
+            )
+            if not vehicle:
+                return self._make_error_response(_("Vehicle not found."), status=404)
+
+            inquiry = request.env['crm.lead'].sudo().create({
+                'name': _("Vehicle inquiry: %s") % vehicle_ref,
+                'contact_name': name,
+                'email_from': email,
+                'phone': str(kwargs.get('phone') or '').strip(),
+                'description': message,
+                'type': 'lead',
+            })
+            entitlement = request.env[
+                'pb.chassis.reveal.entitlement'
+            ].sudo().grant(
+                self._session_id(),
+                vehicle_model,
+                entitlement_ref,
+                inquiry,
+            )
+            if not entitlement:
+                return self._make_error_response(
+                    _("Unable to authorize this inquiry session."),
+                    status=500,
+                )
+            return self._make_json_response({
+                'success': True,
+                'lead_id': inquiry.id,
+                'vehicle_id': vehicle.id,
+                'expires_at': entitlement.expires_at,
+            })
+        except Exception:
+            _logger.exception("Unexpected error in submit_vehicle_inquiry")
+            return self._make_error_response(
+                _("An unexpected error occurred while submitting the inquiry."),
+                status=500,
+            )
 
     @http.route('/api/v1/website/shipping/rates', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_shipping_rates(self, **kwargs):
@@ -951,8 +1124,22 @@ class WebsiteCatalogController(http.Controller):
     def contact(self, **kwargs):
         """
         API Endpoint: Creates a new lead in CRM (crm.lead) from contact form submission.
+
+        Protected by the shared public-write boundary: reCAPTCHA verification and
+        rate limiting run before any CRM or email side effect. Email template and
+        internal recipient come from server policy only.
         """
         try:
+            # Abuse controls first — no CRM/email side effects on failure
+            try:
+                enforce_public_write(kwargs, expected_action='contact')
+            except PublicWriteError as pwe:
+                _logger.info(
+                    "contact public-write blocked code=%s",
+                    pwe.code,
+                )
+                return self._public_write_error_response(pwe)
+
             tlt = kwargs.get('tlt')
             name = kwargs.get('name')
             country_name = kwargs.get('country')
@@ -964,7 +1151,11 @@ class WebsiteCatalogController(http.Controller):
             msg = kwargs.get('msg')
 
             if not name or not email or not msg:
-                return self._make_error_response(_("Name, Email, and Message are required fields."), status=400)
+                return self._make_error_response(
+                    _("Name, Email, and Message are required fields."),
+                    status=400,
+                    code='VALIDATION_ERROR',
+                )
 
             # Resolve Country ID
             country_id = False
@@ -992,10 +1183,10 @@ class WebsiteCatalogController(http.Controller):
             }
             lead = request.env['crm.lead'].sudo().create(lead_vals)
 
-            # Get configured sales email and sender email
-            email_params = self._get_email_params()
-            sales_email = email_params['default_email_sales']
-            from_email = email_params['default_email']
+            # Server policy only — ignore any client template/recipient overrides
+            email_policy = resolve_contact_email_policy()
+            sales_email = email_policy['email_to']
+            from_email = email_policy['email_from']
 
             # Create mail.mail email record for contact inquiry
             try:
@@ -1106,11 +1297,21 @@ class WebsiteCatalogController(http.Controller):
                 {self._get_common_mail_footer(default_email)}
                 """
 
-            # Determine email recipient based on template context
+            # Determine email recipient based on template context.
+            # Server policy: contact_us always uses internal sales recipient — client cannot override.
             is_customer_facing = template_code in ['welcome_member'] or data.get('is_applicant_confirmation')
             is_job_template = 'job' in template_code or 'recruitment' in template_code
+            is_contact_template = template_code in ('contact_us', 'contact')
 
-            if recipient_email:
+            if is_contact_template:
+                email_policy = resolve_contact_email_policy()
+                email_to = email_policy['email_to']
+                if recipient_email and recipient_email.strip().lower() != (email_to or '').strip().lower():
+                    _logger.info(
+                        "email/send ignored client recipient for contact_us (policy=%s)",
+                        email_to,
+                    )
+            elif recipient_email:
                 email_to = recipient_email
             elif is_customer_facing:
                 email_to = data.get('email') or default_email
@@ -1472,10 +1673,3 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
-
-
-
-
-
-
-
