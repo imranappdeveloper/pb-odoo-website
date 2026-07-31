@@ -24,11 +24,13 @@
               action="action_pb_job"
               sequence="30"/>
 
+    <!--
     <menuitem id="menu_pb_website_team_members"
               name="Team Members"
               parent="menu_pb_website_root"
               action="action_pb_team_member"
               sequence="40"/>
+    -->
 
     <menuitem id="menu_pb_website_recruitment_inquiries"
               name="Recruitment Inquiries"
@@ -37,7 +39,7 @@
               sequence="50"/>
 
     <menuitem id="menu_pb_website_banners"
-              name="Hero Banners"
+              name="Top page banner"
               parent="menu_pb_website_root"
               action="action_pb_banner"
               sequence="60"/>

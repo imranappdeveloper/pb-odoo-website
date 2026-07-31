@@ -977,7 +977,6 @@ class WebsiteCatalogController(http.Controller):
                 _("An unexpected error occurred while submitting the inquiry."),
                 status=500,
             )
-
     @http.route('/api/v1/website/shipping/rates', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def get_shipping_rates(self, **kwargs):
         """
@@ -1135,8 +1134,9 @@ class WebsiteCatalogController(http.Controller):
                 enforce_public_write(kwargs, expected_action='contact')
             except PublicWriteError as pwe:
                 _logger.info(
-                    "contact public-write blocked code=%s",
+                    "contact public-write blocked code=%s ip=%s",
                     pwe.code,
+                    (request.httprequest.remote_addr if request.httprequest else 'n/a'),
                 )
                 return self._public_write_error_response(pwe)
 
@@ -1673,3 +1673,4 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
+
