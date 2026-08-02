@@ -2,7 +2,7 @@
 <odoo>
     <!-- Top-level Menu in App Switcher -->
     <menuitem id="menu_pb_website_root"
-              name="Website Admin (v1.2)"
+              name="Website Admin (v1.5)"
               sequence="100"/>
 
     <!-- Sub-menus: Content -->
