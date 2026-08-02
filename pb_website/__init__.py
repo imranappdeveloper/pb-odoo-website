@@ -181,7 +181,24 @@ def post_init_hook(env):
     else:
         _logger.info("pb.job records already exist, skipping seeding")
 
-    # 6. Seed System Parameters
+    # 6. Seed / Populate Gallery Images (pb.gallery)
+    gallery_model = env['pb.gallery']
+    unpopulated_gallery = gallery_model.search([('image', '=', False)])
+    if unpopulated_gallery:
+        try:
+            image_files = [f for f in sorted(os.listdir(os.path.join(seed_dir, 'images'))) if f.endswith(('.jpg', '.png', '.jpeg'))]
+            for idx, rec in enumerate(unpopulated_gallery):
+                if image_files:
+                    img_name = image_files[idx % len(image_files)]
+                    img_path = os.path.join(seed_dir, 'images', img_name)
+                    if os.path.exists(img_path):
+                        with open(img_path, 'rb') as f:
+                            rec.sudo().write({'image': base64.b64encode(f.read())})
+            _logger.info("Successfully populated gallery images")
+        except Exception as e:
+            _logger.error("Failed to populate gallery images: %s", str(e))
+
+    # 7. Seed System Parameters
     try:
         config_param = env['ir.config_parameter'].sudo()
         if not config_param.get_param('pb_website.default_email'):
@@ -193,6 +210,7 @@ def post_init_hook(env):
         _logger.info("Successfully checked/seeded pb_website email system parameters")
     except Exception as e:
         _logger.error("Failed to seed email system parameters: %s", str(e))
+
 
 
 
