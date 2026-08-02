@@ -192,7 +192,7 @@ class WebsiteCatalogController(http.Controller):
         """
 
 
-    @http.route('/api/v1/website/search-options', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    @http.route('/api/v1/website/search-options', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
     def get_search_options(self, **kwargs):
         """
         API Endpoint: Returns options for filtering dropdowns (makes, models, categories/body types, etc.).
@@ -259,7 +259,7 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_search_options")
             return self._make_error_response(_("An unexpected error occurred while fetching search options."), status=500)
 
-    @http.route('/api/v1/website/testimonials', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    @http.route('/api/v1/website/testimonials', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
     def get_testimonials(self, **kwargs):
         """
         API Endpoint: Returns seeded list of customer testimonials.
@@ -321,7 +321,7 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Error serving news image")
         return request.not_found()
 
-    @http.route('/api/v1/website/banners', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    @http.route('/api/v1/website/banners', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
     def get_banners(self, **kwargs):
         """
         API Endpoint: Returns list of active hero banners.
@@ -346,7 +346,7 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_banners")
             return self._make_error_response(_("An unexpected error occurred while fetching banners."), status=500)
 
-    @http.route('/api/v1/website/gallery', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    @http.route('/api/v1/website/gallery', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
     def get_gallery(self, **kwargs):
         """
         API Endpoint: Returns list of active photo gallery images.
@@ -547,7 +547,7 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in submit_recruitment_inquiry")
             return self._make_error_response(_("An unexpected error occurred while submitting recruitment inquiry."), status=500)
 
-    @http.route('/api/v1/website/news', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
+    @http.route('/api/v1/website/news', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
     def get_news(self, **kwargs):
         """
         API Endpoint: Returns seeded list of news articles or single article detail.
