@@ -9,6 +9,7 @@
                 <field name="title"/>
                 <field name="date"/>
                 <field name="published"/>
+                <field name="is_special"/>
             </list>
         </field>
     </record>
@@ -31,6 +32,7 @@
                         <group>
                             <field name="date"/>
                             <field name="published"/>
+                            <field name="is_special"/>
                         </group>
                     </group>
                     <notebook>

@@ -564,7 +564,8 @@ class WebsiteCatalogController(http.Controller):
                     "body": record.body or "",
                     "thumbnail": f"data:image/jpeg;base64,{record.thumbnail.decode('utf-8')}" if record.thumbnail else "",
                     "date": record.date,
-                    "published": record.published
+                    "published": record.published,
+                    "is_special": record.is_special
                 })
 
             records = request.env['pb.news'].sudo().search([('published', '=', True)])
@@ -576,7 +577,8 @@ class WebsiteCatalogController(http.Controller):
                     "body": record.body or "",
                     "thumbnail": f"data:image/jpeg;base64,{record.thumbnail.decode('utf-8')}" if record.thumbnail else "",
                     "date": record.date,
-                    "published": record.published
+                    "published": record.published,
+                    "is_special": record.is_special
                 })
             return self._make_json_response(news)
         except Exception as e:
@@ -1005,6 +1007,12 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Registers a new portal user and maps name, email, phone, country, and company details to res.partner.
         """
         try:
+            try:
+                enforce_public_write(kwargs, expected_action='registration')
+            except PublicWriteError as pwe:
+                _logger.info("registration public-write blocked code=%s", pwe.code)
+                return self._public_write_error_response(pwe)
+
             name = kwargs.get('name')
             email = kwargs.get('email')
             password = kwargs.get('password')
@@ -1073,6 +1081,12 @@ class WebsiteCatalogController(http.Controller):
         API Endpoint: Initiates Odoo password reset flow and returns standard or offline reset link.
         """
         try:
+            try:
+                enforce_public_write(kwargs, expected_action='password_recovery')
+            except PublicWriteError as pwe:
+                _logger.info("password recovery public-write blocked code=%s", pwe.code)
+                return self._public_write_error_response(pwe)
+
             email = (kwargs.get('email') or kwargs.get('login') or '').strip()
             if not email:
                 return self._make_error_response(_("Email ID/Login ID is required."), status=400)
@@ -1673,4 +1687,3 @@ class WebsiteCatalogController(http.Controller):
         except Exception as e:
             _logger.exception("Error in get_website_currencies")
             return self._make_error_response(_("An unexpected error occurred while fetching currencies."), status=500)
-

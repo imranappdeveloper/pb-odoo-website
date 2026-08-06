@@ -14,6 +14,63 @@ from ..controllers.public_write_protection import (
 
 
 class PublicWriteProtectionTest(BaseCase):
+    def test_registration_controller_gates_before_account_creation(self):
+        controller = WebsiteCatalogController()
+        blocked = PublicWriteError(
+            'RECAPTCHA_MISSING',
+            'Please complete the human verification check and try again.',
+        )
+        with patch.object(main_controller, 'enforce_public_write', side_effect=blocked) as gate, patch.object(
+            main_controller.request.env['res.users'].sudo(),
+            'create',
+            side_effect=AssertionError('account path reached before public-write gate'),
+        ):
+            result = controller.register(
+                name='Test Buyer',
+                email='buyer@example.com',
+                password='safe-password',
+                country='Japan',
+                phone='+810000000000',
+                recaptcha_action='registration',
+            )
+
+        self.assertEqual(result['status'], 'error')
+        self.assertEqual(result['data']['code'], 'RECAPTCHA_MISSING')
+        gate.assert_called_once_with(
+            {
+                'name': 'Test Buyer',
+                'email': 'buyer@example.com',
+                'password': 'safe-password',
+                'country': 'Japan',
+                'phone': '+810000000000',
+                'recaptcha_action': 'registration',
+            },
+            expected_action='registration',
+        )
+
+    def test_password_recovery_controller_gates_before_account_lookup(self):
+        controller = WebsiteCatalogController()
+        blocked = PublicWriteError(
+            'RECAPTCHA_MISSING',
+            'Please complete the human verification check and try again.',
+        )
+        with patch.object(main_controller, 'enforce_public_write', side_effect=blocked) as gate, patch.object(
+            main_controller.request.env['res.users'].sudo(),
+            'search',
+            side_effect=AssertionError('account lookup reached before public-write gate'),
+        ):
+            result = controller.forgot_password(
+                email='buyer@example.com',
+                recaptcha_action='password_recovery',
+            )
+
+        self.assertEqual(result['status'], 'error')
+        self.assertEqual(result['data']['code'], 'RECAPTCHA_MISSING')
+        gate.assert_called_once_with(
+            {'email': 'buyer@example.com', 'recaptcha_action': 'password_recovery'},
+            expected_action='password_recovery',
+        )
+
     def test_contact_controller_gates_before_validation_side_effects(self):
         controller = WebsiteCatalogController()
         blocked = PublicWriteError(
