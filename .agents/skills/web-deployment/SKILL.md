@@ -39,9 +39,11 @@ if [ -z "$NEXT_VER" ]; then NEXT_VER=1; fi
 echo "Bumping version to 1.$NEXT_VER..."
 # Update manifest version
 sed -i '' "s/'version': '[^']*'/'version': '1.$NEXT_VER'/" pb_website/__manifest__.py
+# Update menu version text
+sed -i '' "s/Website Admin (v[^)]*)/Website Admin (v1.$NEXT_VER)/" pb_website/views/menus.xml
 
 # 2. Commit and Push Version Bump
-git add pb_website/__manifest__.py
+git add pb_website/__manifest__.py pb_website/views/menus.xml
 git commit -m "Release v$NEXT_VER: Version maintenance bump"
 git push origin main
 
@@ -64,8 +66,9 @@ ssh root@$SERVER_IP << EOF
   cd $REMOTE_PATH
   git pull
 
-  # Check if module is already installed on pb_tus
+  # Update Apps list and check if module is already installed on pb_tus
   MODULE_STATUS=$(sudo -u odoo18 /opt/odoo18/venv/bin/python3 /opt/odoo18/odoo-bin shell -c /etc/odoo18.conf -d pb_tus --stop-after-init --http-port=8899 --shell-interface=python << 'PY_EOF'
+env['ir.module.module'].update_list()
 module = env['ir.module.module'].search([('name', '=', 'pb_website')])
 print(module.state if module else 'not_found')
 PY_EOF
