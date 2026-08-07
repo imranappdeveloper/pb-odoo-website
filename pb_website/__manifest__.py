@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Pacific Boeki Website API & Core',
-    'version': '1.7',
+    'version': '1.8',
     'category': 'Website/Website',
     'summary': 'API endpoints and custom models for Pacific Boeki Next.js website integration.',
     'description': """
