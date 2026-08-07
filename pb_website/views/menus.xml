@@ -3,7 +3,8 @@
     <!-- Top-level Menu in App Switcher -->
     <menuitem id="menu_pb_website_root"
               name="Website Admin (v1.7)"
-              sequence="100"/>
+              sequence="100"
+              groups="base.group_system"/>
 
     <!-- Sub-menus: Content -->
     <menuitem id="menu_pb_website_testimonials"
