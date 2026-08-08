@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
-
-from odoo import http, _
+from odoo import http, fields, _
 from odoo.http import request
 import json
 import logging
+from datetime import timedelta
 
 from .chassis_security import mask_chassis, protect_serialized_vehicle
 from .public_write_protection import (
@@ -1001,6 +1000,27 @@ class WebsiteCatalogController(http.Controller):
             _logger.exception("Unexpected error in get_shipping_rates")
             return self._make_error_response(_("An unexpected error occurred while fetching shipping rates."), status=500)
 
+    @http.route('/api/v1/website/cif-countries', type='json', auth='public', methods=['POST', 'GET', 'OPTIONS'], csrf=False, cors='*')
+    def get_cif_countries(self, **kwargs):
+        """
+        API Endpoint: Returns active CIF countries list (id, country_id, name, code).
+        """
+        try:
+            records = request.env['cif.country'].sudo().search([('active', '=', True)])
+            cif_countries = []
+            for record in records:
+                if record.country_id:
+                    cif_countries.append({
+                        "id": record.id,
+                        "country_id": record.country_id.id,
+                        "name": record.country_id.name or "",
+                        "code": record.country_id.code or ""
+                    })
+            return self._make_json_response(cif_countries)
+        except Exception as e:
+            _logger.exception("Unexpected error in get_cif_countries")
+            return self._make_error_response(_("An unexpected error occurred while fetching CIF countries."), status=500)
+
     @http.route('/api/v1/website/register', type='json', auth='public', methods=['POST'], csrf=False, cors='*')
     def register(self, **kwargs):
         """
@@ -1016,12 +1036,12 @@ class WebsiteCatalogController(http.Controller):
             name = kwargs.get('name')
             email = kwargs.get('email')
             password = kwargs.get('password')
-            country_name = kwargs.get('country')
+            country_input = kwargs.get('country') or kwargs.get('country_id') or kwargs.get('country_code')
             phone = kwargs.get('phone')
             company_type = kwargs.get('company_type', 'person')
             company_name = kwargs.get('company_name')
 
-            if not name or not email or not password or not country_name or not phone:
+            if not name or not email or not password or not country_input or not phone:
                 return self._make_error_response(_("Name, Email, Password, Country, and Phone are required fields."), status=400)
 
             # Check if login already exists
@@ -1029,12 +1049,34 @@ class WebsiteCatalogController(http.Controller):
             if existing_user:
                 return self._make_error_response(_("A member account with this email already exists."), status=400)
 
-            # Resolve Country ID
-            country_id = False
-            if country_name:
-                country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
-                if country:
-                    country_id = country.id
+            # Resolve Country ID by name, ID, or code
+            country = request.env['res.country'].browse()
+            if country_input:
+                c_val = str(country_input).strip()
+                if c_val.isdigit():
+                    c_by_id = request.env['res.country'].sudo().browse(int(c_val))
+                    if c_by_id.exists():
+                        country = c_by_id
+                if not country.exists():
+                    c_by_code = request.env['res.country'].sudo().search([('code', '=ilike', c_val)], limit=1)
+                    if c_by_code.exists():
+                        country = c_by_code
+                if not country.exists():
+                    c_by_name = request.env['res.country'].sudo().search([('name', '=ilike', c_val)], limit=1)
+                    if c_by_name.exists():
+                        country = c_by_name
+
+            country_id = country.id if country.exists() else False
+
+            # Check active CIF country match
+            is_cif = False
+            if country.exists():
+                cif_record = request.env['cif.country'].sudo().search([
+                    ('country_id', '=', country.id),
+                    ('active', '=', True)
+                ], limit=1)
+                if cif_record:
+                    is_cif = True
 
             # Retrieve base portal group XML ref
             portal_group = request.env.ref('base.group_portal')
@@ -1057,11 +1099,27 @@ class WebsiteCatalogController(http.Controller):
                 'country_id': country_id,
                 'company_type': company_type,
                 'is_company': company_type == 'company',
+                'is_special_proforma_invoice': is_cif,
             }
             if company_name:
                 partner_vals['company_name'] = company_name
 
             partner.sudo().write(partner_vals)
+
+            # Configure Auction Member record (auction.partner.settings)
+            settings = request.env['auction.partner.settings'].sudo().search([('partner_id', '=', partner.id)], limit=1)
+            target_fee_type = 'fixed' if is_cif else 'percentage'
+            if not settings:
+                today = fields.Date.today()
+                settings = request.env['auction.partner.settings'].sudo().create({
+                    'partner_id': partner.id,
+                    'auction_user_status': 'trial',
+                    'trial_expiration_date': today + timedelta(days=5),
+                    'fee_type': target_fee_type,
+                    'is_active': True,
+                })
+            else:
+                settings.sudo().write({'fee_type': target_fee_type})
 
             return self._make_json_response({
                 'uid': new_user.id,
