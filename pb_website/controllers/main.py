@@ -1034,7 +1034,7 @@ class WebsiteCatalogController(http.Controller):
                 return self._public_write_error_response(pwe)
 
             name = kwargs.get('name')
-            email = kwargs.get('email')
+            email = (kwargs.get('email') or '').strip()
             password = kwargs.get('password')
             country_input = kwargs.get('country') or kwargs.get('country_id') or kwargs.get('country_code')
             phone = kwargs.get('phone')
@@ -1044,10 +1044,16 @@ class WebsiteCatalogController(http.Controller):
             if not name or not email or not password or not country_input or not phone:
                 return self._make_error_response(_("Name, Email, Password, Country, and Phone are required fields."), status=400)
 
-            # Check if login already exists
-            existing_user = request.env['res.users'].sudo().search([('login', '=', email)], limit=1)
-            if existing_user:
-                return self._make_error_response(_("A member account with this email already exists."), status=400)
+            # Reject duplicate accounts before res.users.create() so the client
+            # receives a typed validation error instead of a generic constraint failure.
+            existing_user = request.env['res.users'].sudo().search([('login', '=ilike', email)], limit=1)
+            existing_partner = request.env['res.partner'].sudo().search([('email', '=ilike', email)], limit=1)
+            if existing_user or existing_partner:
+                return self._make_error_response(
+                    _("A member account with this email already exists. Please log in or reset your password."),
+                    status=400,
+                    code='VALIDATION_ERROR',
+                )
 
             # Resolve Country ID by name, ID, or code
             country = request.env['res.country'].browse()
